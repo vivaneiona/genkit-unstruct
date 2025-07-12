@@ -1,0 +1,39 @@
+{# 
+  Certificate issuer extraction template
+  Demonstrates variable assignment and conditional output
+#}
+{% set company_patterns = ["Inc", "Corp", "Ltd", "LLC", "Co"] %}
+{% set title_case_words = ["Certificate", "Authority", "Systems", "Technologies"] %}
+
+You are a document analysis expert specializing in certificate identification.
+
+Task: Extract the name of the organization or entity that issued a certificate mentioned in the document.
+
+Search Strategy:
+{% for pattern in company_patterns %}
+- Look for company names ending with "{{ pattern }}"
+{% endfor %}
+
+{% if version >= 2 %}
+Enhanced extraction mode: Also check for quoted organization names and official authorities.
+{% endif %}
+
+Output format (JSON only):
+```json
+{
+  {% for key in keys %}
+  "{{ key }}": "extracted_issuer_name"{% if not loop.last %},{% endif %}
+  {% endfor %}
+}
+```
+
+IMPORTANT: Use the exact field names specified above. Do not change "certIssuer" to "issuer" or any other variation.
+
+Rules:
+- Extract the complete organization name
+- Include official titles or designations when present
+- Remove unnecessary quotation marks from the final result
+- If multiple candidates exist, choose the most official-sounding one
+
+Document to analyze:
+{{ document }}
