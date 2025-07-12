@@ -13,6 +13,7 @@ import (
 type StickPromptProvider struct {
 	env       *stick.Env
 	templates map[string]string
+	vars      map[string]interface{} // Template variables
 }
 
 // → Option pattern keeps the constructor flexible
@@ -49,11 +50,23 @@ func WithTemplates(m map[string]string) Option {
 	}
 }
 
+// WithVar adds a variable that will be available in all templates
+func WithVar(key string, value interface{}) Option {
+	return func(p *StickPromptProvider) error {
+		if p.vars == nil {
+			p.vars = make(map[string]interface{})
+		}
+		p.vars[key] = value
+		return nil
+	}
+}
+
 // NewStickPromptProvider builds a provider from any combination of options.
 func NewStickPromptProvider(opts ...Option) (*StickPromptProvider, error) {
 	p := &StickPromptProvider{
 		env:       stick.New(nil),
 		templates: make(map[string]string),
+		vars:      make(map[string]interface{}),
 	}
 	for _, opt := range opts {
 		if err := opt(p); err != nil {
@@ -72,11 +85,18 @@ func (p *StickPromptProvider) GetPrompt(tag string, version int) (string, error)
 	if !ok {
 		return "", fmt.Errorf("template %q not found", tag)
 	}
-	var out strings.Builder
-	templateCtx := map[string]stick.Value{
-		"version": version,
-		"tag":     tag,
+
+	// Prepare template context with default variables plus custom ones
+	templateCtx := make(map[string]stick.Value)
+	templateCtx["version"] = version
+	templateCtx["tag"] = tag
+
+	// Add custom variables
+	for k, v := range p.vars {
+		templateCtx[k] = v
 	}
+
+	var out strings.Builder
 	if err := p.env.Execute(tpl, &out, templateCtx); err != nil {
 		return "", fmt.Errorf("execute %q: %w", tag, err)
 	}

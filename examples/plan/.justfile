@@ -3,8 +3,7 @@ default:
     @just -f {{source_file()}} --unsorted --list --list-prefix '{{BOLD}}➤ {{NORMAL}}' --list-heading $'' | sed 's/^   //g'
 
 # Run the full build suite
-all:
-    tidy vet test build
+all: tidy vet test build
 
 # Run Go tests
 test:

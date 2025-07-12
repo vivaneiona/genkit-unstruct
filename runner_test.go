@@ -220,14 +220,14 @@ func TestNewErrGroupRunner(t *testing.T) {
 // TestRunnerInterface ensures the interface is properly implemented
 func TestRunnerInterface(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Test that DefaultRunner returns something that implements Runner
 	var runner Runner = DefaultRunner(ctx)
-	
+
 	// Test the interface methods exist and can be called
 	runner.Go(func() error { return nil })
 	err := runner.Wait()
-	
+
 	if err != nil {
 		t.Errorf("Basic interface test failed: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestRunnerInterface(t *testing.T) {
 // BenchmarkRunner tests performance characteristics
 func BenchmarkErrGroupRunner(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.Run("Sequential", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			runner := DefaultRunner(ctx)
@@ -244,10 +244,10 @@ func BenchmarkErrGroupRunner(b *testing.B) {
 			_ = runner.Wait()
 		}
 	})
-	
+
 	b.Run("Concurrent", func(b *testing.B) {
 		runner := DefaultRunner(ctx)
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			runner.Go(func() error { return nil })

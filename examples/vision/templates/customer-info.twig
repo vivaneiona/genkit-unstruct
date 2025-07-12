@@ -1,0 +1,10 @@
+Extract customer/buyer information from this document (File URI: {{ fileURI }}):
+
+Look for the recipient information (usually labeled as "Bill To", "Customer", or on the right side).
+Extract the following fields: {{ Keys|join(', ') }}
+Focus on: customer names, billing/shipping addresses, contact info
+
+Return as JSON object with "customer" field containing nested object with name, address, phone, and email.
+Example: {"customer": {"name": "Customer Name", "address": "456 Oak Ave", "phone": "555-5678", "email": "customer@email.com"}}
+
+Document text: {{ Document }}

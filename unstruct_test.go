@@ -18,8 +18,8 @@ type TestProject struct {
 // Test structure with missing prompts
 type ProjectWithMissingPrompts struct {
 	Name      string  `json:"name" unstruct:"basic"`
-	Code      string  `json:"code"`                 // Missing prompt - should error
-	Latitude  float64 `json:"lat"`                  // Missing prompt - should error
+	Code      string  `json:"code"` // Missing prompt - should error
+	Latitude  float64 `json:"lat"`  // Missing prompt - should error
 	Longitude float64 `json:"lon" unstruct:"coords"`
 }
 

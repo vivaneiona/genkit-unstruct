@@ -1,0 +1,14 @@
+Analyze this document image (File URI: {{ fileURI }}) and identify:
+1. The type of document (invoice, receipt, contract, form, etc.)
+2. The document date
+
+Extract the following fields: {{ Keys|join(', ') }}
+Focus on document headers, titles, and date stamps.
+Return as JSON object with the exact field names from the Keys list.
+
+Pay special attention to:
+- Document headers and titles that indicate document type
+- Date stamps, creation dates, or issue dates
+- Letterheads or official document markers
+
+Document text: {{ Document }}

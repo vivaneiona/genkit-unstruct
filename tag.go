@@ -37,7 +37,7 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 func knownModel(model string) bool {
 	switch model {
 	case "gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-flash-8b",
-		"gemini-1.0-pro", "gemini-pro", "gemini-flash":
+		"gemini-2.5-pro", "gemini-1.0-pro", "gemini-pro", "gemini-flash":
 		return true
 	default:
 		return false

@@ -113,6 +113,7 @@ func GenerateBytes(ctx context.Context, client *genai.Client, log *slog.Logger, 
 	}
 
 	log.Debug("Generated content successfully", "response_length", len(part.Text))
+	log.Debug("Raw response content", "content", part.Text)
 	return []byte(part.Text), nil
 }
 
@@ -193,7 +194,10 @@ func (x *Unstructor[T]) Unstruct(
 		pk, keys := pk, keys // loop capture
 		r.Go(func() error {
 			model := opts.Model
-			if len(keys) == 1 {
+			// Use model from promptKey if specified, otherwise check individual fields
+			if pk.model != "" {
+				model = pk.model
+			} else if len(keys) == 1 {
 				if m := sch.json2field[keys[0]].model; m != "" {
 					model = m
 				}
@@ -219,10 +223,12 @@ func (x *Unstructor[T]) Unstruct(
 	var out T
 	x.log.Debug("Starting JSON fragment merge", "fragment_count", len(fragments))
 	for _, f := range fragments {
+		x.log.Debug("Processing fragment", "prompt", f.prompt, "raw_content", string(f.raw))
 		if err := patchStruct(&out, f.raw, sch.json2field); err != nil {
 			x.log.Debug("Merge failed", "prompt", f.prompt, "error", err)
 			return nil, fmt.Errorf("merge %q: %w", f.prompt, err)
 		}
+		x.log.Debug("Fragment merged successfully", "prompt", f.prompt)
 	}
 
 	x.log.Info("Extraction completed successfully", "type", fmt.Sprintf("%T", out))

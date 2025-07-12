@@ -1,0 +1,13 @@
+Extract financial information from this document image (File URI: {{ fileURI }}):
+
+Look for and extract: {{ Keys|join(', ') }}
+Pay special attention to:
+- Numbers with currency symbols ($, €, £, etc.)
+- Totals, subtotals, and grand totals  
+- Invoice numbers (often alphanumeric)
+- Dates related to payment or due dates
+
+Return as JSON object with "invoice" field containing nested object with invoiceNumber, totalAmount (as number without commas), currency, and dueDate.
+Example: {"invoice": {"invoiceNumber": "2023-1022", "totalAmount": 2552.00, "currency": "USD", "dueDate": "2023-11-15"}}
+
+Document text: {{ Document }}

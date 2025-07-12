@@ -12,6 +12,7 @@ const unstractTag = "unstruct"
 type promptKey struct {
 	prompt     string // explicit label or ""
 	parentPath string // dotted path w/o the leaf field
+	model      string // model name for this group
 }
 
 type fieldSpec struct {
@@ -66,7 +67,7 @@ func schemaOf[T any]() (*schema, error) {
 				continue
 			}
 
-			pk := promptKey{prompt: tp.prompt, parentPath: parent}
+			pk := promptKey{prompt: tp.prompt, parentPath: parent, model: tp.model}
 			s.group2keys[pk] = append(s.group2keys[pk], fullKey)
 			s.json2field[fullKey] = fieldSpec{
 				jsonKey: fullKey, model: tp.model, index: nextIdx,

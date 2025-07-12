@@ -13,6 +13,7 @@ A Go library for extracting structured data from unstructured text using AI mode
 - **Concurrent Processing**: Multiple extractions run in parallel with configurable concurrency
 - **Type Safety**: Strongly-typed Go structs with compile-time guarantees
 - **Template Support**: Support for Stick templates and custom prompt providers
+- **Vision Support**: Extract structured data from images using Genkit Files API
 - **Cost Estimation**: Built-in cost estimation and token counting
 - **Retry Logic**: Configurable retry mechanisms with exponential backoff
 
@@ -137,6 +138,9 @@ cd examples/complex && go run main.go
 
 # Cost estimation and planning
 cd examples/plan && go run main.go
+
+# Vision-based extraction with Genkit Files API
+cd examples/vision && go run main.go
 ```
 
 ## Installation

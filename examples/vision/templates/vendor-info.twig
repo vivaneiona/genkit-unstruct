@@ -1,0 +1,10 @@
+Extract vendor/seller company information from this document (File URI: {{ fileURI }}):
+
+Look for the company that issued this document (usually at the top or left side).
+Extract the following fields: {{ Keys|join(', ') }}
+Focus on: company names, complete addresses, phone numbers, email addresses
+
+Return as JSON object with "vendor" field containing nested object with name, address, phone, and email.
+Example: {"vendor": {"name": "Company Name", "address": "123 Main St", "phone": "555-1234", "email": "info@company.com"}}
+
+Document text: {{ Document }}

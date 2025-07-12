@@ -33,10 +33,10 @@ type SliceStruct struct {
 }
 
 type ModelOverrideStruct struct {
-	BasicField  string `json:"basic" unstruct:"basic"`
-	FlashField  string `json:"flash" unstruct:"fast,gemini-1.5-flash"`
-	ProField    string `json:"pro" unstruct:"complex,gemini-1.5-pro"`
-	ModelOnly   string `json:"model_only" unstruct:"gemini-1.5-flash-8b"`
+	BasicField string `json:"basic" unstruct:"basic"`
+	FlashField string `json:"flash" unstruct:"fast,gemini-1.5-flash"`
+	ProField   string `json:"pro" unstruct:"complex,gemini-1.5-pro"`
+	ModelOnly  string `json:"model_only" unstruct:"gemini-1.5-flash-8b"`
 }
 
 type InheritanceStruct struct {
@@ -44,17 +44,17 @@ type InheritanceStruct struct {
 }
 
 type ParentStruct struct {
-	Child1 string `json:"child1"` // Should inherit "inherited_prompt"
+	Child1 string `json:"child1"`                     // Should inherit "inherited_prompt"
 	Child2 string `json:"child2" unstruct:"override"` // Should override
 }
 
 type EdgeCaseStruct struct {
-	Ignored       string    `json:"-"`
-	NoTag         string    `json:"no_tag"`
-	EmptyTag      string    `json:"empty_tag" unstruct:""`
-	TimeField     time.Time `json:"time_field" unstruct:"temporal"`
-	unexported    string    `json:"unexported" unstruct:"basic"`
-	Anonymous     struct{ Field string } // Anonymous struct
+	Ignored    string                 `json:"-"`
+	NoTag      string                 `json:"no_tag"`
+	EmptyTag   string                 `json:"empty_tag" unstruct:""`
+	TimeField  time.Time              `json:"time_field" unstruct:"temporal"`
+	unexported string                 `json:"unexported" unstruct:"basic"`
+	Anonymous  struct{ Field string } // Anonymous struct
 }
 
 func TestSchemaOf_SimpleStruct(t *testing.T) {
@@ -74,7 +74,7 @@ func TestSchemaOf_SimpleStruct(t *testing.T) {
 	}
 
 	// Check the basic group
-	basicKey := promptKey{prompt: "basic", parentPath: ""}
+	basicKey := promptKey{prompt: "basic", parentPath: "", model: ""}
 	keys, exists := sch.group2keys[basicKey]
 	if !exists {
 		t.Error("Expected 'basic' prompt group to exist")
@@ -118,7 +118,7 @@ func TestSchemaOf_NestedStruct(t *testing.T) {
 	// Check nested field paths
 	expectedFields := []string{
 		"user.first_name",
-		"user.last_name", 
+		"user.last_name",
 		"user.email",
 		"project.name",
 		"project.desc",
@@ -193,7 +193,7 @@ func TestSchemaOf_Inheritance(t *testing.T) {
 	if !exists {
 		t.Error("Expected inherited prompt group to exist")
 	}
-	
+
 	found := false
 	for _, key := range keys {
 		if key == "parent.child1" {
@@ -211,7 +211,7 @@ func TestSchemaOf_Inheritance(t *testing.T) {
 	if !exists {
 		t.Error("Expected override prompt group to exist")
 	}
-	
+
 	found = false
 	for _, key := range keys {
 		if key == "parent.child2" {
@@ -286,7 +286,7 @@ func TestJoinKey(t *testing.T) {
 	for _, test := range tests {
 		result := joinKey(test.parent, test.child)
 		if result != test.expected {
-			t.Errorf("joinKey(%q, %q) = %q, expected %q", 
+			t.Errorf("joinKey(%q, %q) = %q, expected %q",
 				test.parent, test.child, result, test.expected)
 		}
 	}
@@ -309,7 +309,7 @@ func TestIsPureStruct(t *testing.T) {
 	for _, test := range tests {
 		result := isPureStruct(test.typ)
 		if result != test.expected {
-			t.Errorf("isPureStruct(%v) = %v, expected %v", 
+			t.Errorf("isPureStruct(%v) = %v, expected %v",
 				test.typ, result, test.expected)
 		}
 	}
