@@ -15,8 +15,8 @@ import (
 )
 
 type Company struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
+	Name    string `json:"name" unstruct:"company"`
+	Address string `json:"address" unstruct:"company"`
 }
 
 // Project represents a complex nested data structure with model-specific extraction
@@ -25,17 +25,17 @@ type Project struct {
 	ProjectMode  string  `json:"projectMode" unstruct:"project"`
 	ProjectName  string  `json:"projectName" unstruct:"project"`
 	CertIssuer   string  `json:"certIssuer"  unstruct:"cert"`
-	Latitude     float64 `json:"lat"`
-	Longitude    float64 `json:"lon"`
+	Latitude     float64 `json:"lat" unstruct:"coords"`
+	Longitude    float64 `json:"lon" unstruct:"coords"`
 
 	// Nested structure with specific model for high-accuracy participant extraction
 	Participant struct {
-		Name    string `json:"name"    unstruct:"gemini-1.5-pro"`
-		Address string `json:"address" unstruct:"gemini-1.5-pro"`
+		Name    string `json:"name"    unstruct:"participant,gemini-1.5-pro"`
+		Address string `json:"address" unstruct:"participant,gemini-1.5-pro"`
 	} `json:"participant"`
 
-	Company    Company   `unstruct:"prompt-name,gemini-1.5-pro"`
-	Affiliated []Company `unstruct:"prompt-name,gemini-1.5-pro"`
+	Company    Company   `unstruct:"company-info,gemini-1.5-pro"`
+	Affiliated []Company `unstruct:"company-info,gemini-1.5-pro"`
 }
 
 func main() {

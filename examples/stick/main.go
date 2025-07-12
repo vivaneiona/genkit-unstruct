@@ -18,8 +18,8 @@ import (
 type Project struct {
 	ProjectCode string  `json:"projectCode" unstruct:"code"`
 	CertIssuer  string  `json:"certIssuer"  unstruct:"cert"`
-	Latitude    float64 `json:"lat"` // default unstractor tag
-	Longitude   float64 `json:"lon"`
+	Latitude    float64 `json:"lat" unstruct:"default"` // explicit prompt
+	Longitude   float64 `json:"lon" unstruct:"default"` // explicit prompt
 }
 
 func main() {

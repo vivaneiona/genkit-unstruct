@@ -38,8 +38,8 @@ func getKeys(m filePrompts) []string {
 type Project struct {
 	ProjectCode string  `json:"projectCode" unstruct:"code"`
 	CertIssuer  string  `json:"certIssuer"  unstruct:"cert"`
-	Latitude    float64 `json:"lat"` // default extractor tag
-	Longitude   float64 `json:"lon"`
+	Latitude    float64 `json:"lat" unstruct:"coords"` // explicit prompt required
+	Longitude   float64 `json:"lon" unstruct:"coords"` // explicit prompt required
 }
 
 func main() {
@@ -92,14 +92,13 @@ func main() {
 
 	// 1. Prompts for each extractor tag ⭐️
 	// 1️⃣
-	slog.Debug("Setting up prompts", "prompt_count", 4)
+	slog.Debug("Setting up prompts", "prompt_count", 3)
 	prompts := filePrompts{
-		"code":      `Extract the project code from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON. Text: {{.Document}}`,
-		"cert":      `Find the certificate issuer from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON. Text: {{.Document}}`,
-		"default":   `Extract location coordinates from this text and return as JSON with fields: {{.Keys}}. Return numeric values for coordinates as numbers, not strings. Example: {"lat": 13.75, "lon": 100.52}. Text: {{.Document}}`,
-		"extractor": `Extract location coordinates from this text and return as JSON with fields: {{.Keys}}. Return numeric values for coordinates as numbers, not strings. Example: {"lat": 13.75, "lon": 100.52}. Text: {{.Document}}`,
+		"code":   `Extract the project code from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON. Text: {{.Document}}`,
+		"cert":   `Find the certificate issuer from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON. Text: {{.Document}}`,
+		"coords": `Extract location coordinates from this text and return as JSON with fields: {{.Keys}}. Return numeric values for coordinates as numbers, not strings. Example: {"lat": 13.75, "lon": 100.52}. Text: {{.Document}}`,
 	}
-	slog.Debug("prompts configured", "code_prompt_length", len(prompts["code"]), "cert_prompt_length", len(prompts["cert"]), "default_prompt_length", len(prompts["default"]), "extractor_prompt_length", len(prompts["extractor"]))
+	slog.Debug("prompts configured", "code_prompt_length", len(prompts["code"]), "cert_prompt_length", len(prompts["cert"]), "coords_prompt_length", len(prompts["coords"]))
 
 	// 2. Build unstructor
 	// 2️⃣

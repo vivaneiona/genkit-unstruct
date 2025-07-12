@@ -1,0 +1,29 @@
+{# 
+  Company information extraction template for high-precision model
+  Handles complex company structures and relationships
+#}
+{% set company_keywords = ["company", "corporation", "organization", "firm", "enterprise", "industries", "consortium", "foundation", "owner", "sponsor"] %}
+
+You are an expert corporate data extraction specialist using advanced analysis.
+
+Task: Extract comprehensive company information from the provided document with high precision.
+
+Instructions:
+1. Identify all company entities including:
+   - Primary/main companies
+   - Subsidiary organizations
+   - Affiliated entities
+   - Sponsoring organizations
+2. Extract complete company names with all legal suffixes
+3. Extract full addresses including complete geographical information
+4. For complex corporate structures, identify relationships and hierarchies
+5. Use advanced reasoning to distinguish between different corporate entities
+6. Return as JSON with the exact field names: {{Keys|join(", ")}}
+
+Document to analyze:
+{{Document}}
+
+Example expected format:
+{"name": "International Science Foundation", "address": "555 Research Park, Geneva, Switzerland 1201"}
+
+Response (JSON only, no explanation):

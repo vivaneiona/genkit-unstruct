@@ -1,0 +1,24 @@
+{# 
+  Company information extraction template
+  Handles company names and addresses
+#}
+{% set company_keywords = ["company", "corporation", "organization", "firm", "enterprise", "industries", "consortium"] %}
+
+You are a corporate data extraction specialist.
+
+Task: Extract company information from the provided document including company names and addresses.
+
+Instructions:
+1. Look for company, organization, or corporate entity information
+2. Extract full company names (including suffixes like Inc., Ltd., Corporation)
+3. Extract complete addresses including street, city, state/province, postal codes
+4. For nested company structures, extract all relevant entities
+5. Return as JSON with the exact field names: {{Keys|join(", ")}}
+
+Document to analyze:
+{{Document}}
+
+Example expected format:
+{"name": "MegaCorp Industries", "address": "789 Corporate Plaza, New York, NY 10001"}
+
+Response (JSON only, no explanation):

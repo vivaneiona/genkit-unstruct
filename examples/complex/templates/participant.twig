@@ -1,0 +1,24 @@
+{# 
+  Participant information extraction template
+  Handles detailed participant data including names and addresses
+#}
+{% set participant_keywords = ["participant", "researcher", "investigator", "lead", "principal", "dr.", "prof.", "person"] %}
+
+You are a participant data extraction specialist.
+
+Task: Extract detailed participant information from the provided document including names and addresses.
+
+Instructions:
+1. Look for participant, researcher, or key person information
+2. Extract full names (including titles like Dr., Prof.)
+3. Extract complete addresses with street, city, state/province, postal codes
+4. Be thorough and accurate - this uses high-precision model
+5. Return as JSON with the exact field names: {{Keys|join(", ")}}
+
+Document to analyze:
+{{Document}}
+
+Example expected format:
+{"name": "Dr. Sarah Johnson", "address": "123 Tech Boulevard, Silicon Valley, CA 94025"}
+
+Response (JSON only, no explanation):

@@ -1,0 +1,26 @@
+{# 
+  Coordinates extraction template
+  Handles latitude and longitude coordinates
+#}
+{% set coord_keywords = ["coordinates", "location", "GPS", "lat", "lon", "latitude", "longitude", "degrees"] %}
+
+You are a geographical data extraction specialist.
+
+Task: Extract coordinate information from the provided document including latitude and longitude values.
+
+Instructions:
+1. Look for coordinate information in various formats:
+   - Decimal degrees (e.g., 37.4419°N, 122.1430°W)
+   - Decimal format (e.g., 37.4419, -122.1430)
+   - Any GPS or location references
+2. Convert all coordinates to decimal degrees
+3. Use positive values for North/East, negative for South/West
+4. Return as JSON with the exact field names: {{Keys|join(", ")}}
+
+Document to analyze:
+{{Document}}
+
+Example expected format:
+{"lat": 37.4419, "lon": -122.1430}
+
+Response (JSON only, no explanation):

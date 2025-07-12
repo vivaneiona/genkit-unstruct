@@ -2,6 +2,7 @@ package unstruct
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -11,6 +12,14 @@ type TestProject struct {
 	Name      string  `json:"name" unstruct:"basic"`
 	Code      string  `json:"code" unstruct:"basic"`
 	Latitude  float64 `json:"lat" unstruct:"coords"`
+	Longitude float64 `json:"lon" unstruct:"coords"`
+}
+
+// Test structure with missing prompts
+type ProjectWithMissingPrompts struct {
+	Name      string  `json:"name" unstruct:"basic"`
+	Code      string  `json:"code"`                 // Missing prompt - should error
+	Latitude  float64 `json:"lat"`                  // Missing prompt - should error
 	Longitude float64 `json:"lon" unstruct:"coords"`
 }
 
@@ -148,5 +157,56 @@ func TestSanitizeJSONResponse(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("For input %q, expected %q, got %q", test.input, test.expected, result)
 		}
+	}
+}
+
+func TestUnstructor_RequiredPrompts(t *testing.T) {
+	ext := NewForTesting[ProjectWithMissingPrompts](mockPrompts{})
+
+	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
+
+	// Should error because fields are missing prompts and no fallback is provided
+	result, err := ext.Unstruct(
+		context.Background(),
+		doc,
+		WithModel("test-model"),
+		WithTimeout(10*time.Second),
+	)
+
+	if err == nil {
+		t.Error("Expected error for missing prompts, got nil")
+	}
+
+	if result != nil {
+		t.Error("Expected nil result when error occurs")
+	}
+
+	// Check that the error message mentions missing prompts
+	expectedError := "no prompt specified"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error to contain %q, got: %v", expectedError, err)
+	}
+}
+
+func TestUnstructor_WithFallbackPrompt(t *testing.T) {
+	ext := NewForTesting[ProjectWithMissingPrompts](mockPrompts{})
+
+	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
+
+	// Should succeed when fallback prompt is provided
+	result, err := ext.Unstruct(
+		context.Background(),
+		doc,
+		WithModel("test-model"),
+		WithTimeout(10*time.Second),
+		WithFallbackPrompt("basic"), // Explicit fallback
+	)
+
+	if err != nil {
+		t.Errorf("Expected no error with fallback prompt, got: %v", err)
+	}
+
+	if result == nil {
+		t.Error("Expected non-nil result with fallback prompt")
 	}
 }

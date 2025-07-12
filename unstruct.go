@@ -140,7 +140,7 @@ func (x *Unstructor[T]) Unstruct(
 	}
 
 	var opts Options
-	opts.FallbackPrompt = "default" // Set default fallback prompt
+	// No default fallback prompt - must be explicitly set
 	for _, fn := range optFns {
 		fn(&opts)
 	}
@@ -341,9 +341,12 @@ func (x *Unstructor[T]) callPrompt(
 	model string,
 	opts Options,
 ) ([]byte, error) {
-	// label may be empty → fallback
+	// label may be empty → check for fallback or error
 	label := promptLabel
 	if label == "" {
+		if opts.FallbackPrompt == "" {
+			return nil, fmt.Errorf("no prompt specified for fields %v and no fallback prompt provided - use WithFallbackPrompt() option", keys)
+		}
 		label = opts.FallbackPrompt
 	}
 
