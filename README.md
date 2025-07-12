@@ -5,6 +5,41 @@
 
 A Go library for extracting structured data from unstructured text using AI models. Built on Google's Genkit framework, it batches prompt-based extractions, runs them concurrently, and merges JSON fragments into Go structs.
 
+## Problem Statement
+
+**What problem does this solve?**
+
+Traditional text parsing with regex and string manipulation is brittle and time-consuming. When you need to extract structured data from natural language text, documents, or mixed content, you face several challenges:
+
+- **Complex parsing logic**: Writing regex patterns and parsers for every text format
+- **Type conversion overhead**: Converting extracted strings to proper Go types manually
+- **Poor performance**: Making individual API calls to AI models for each field
+- **Maintenance burden**: Updating parsers when text formats change
+
+**genkit-unstract solves this by:**
+
+1. **Automatic extraction**: Define your Go struct, specify prompts via tags, get typed data
+2. **Intelligent batching**: Groups fields by prompt to minimize expensive AI API calls  
+3. **Concurrent processing**: Extracts different data types in parallel for speed
+4. **Type safety**: Direct conversion to Go structs with compile-time guarantees
+
+**Example transformation:**
+```go
+// Instead of writing complex regex/parsing code:
+text := "John Doe is 25 years old and lives in New York"
+
+// Just define your structure:
+type Person struct {
+    Name string `json:"name" unstruct:"basic"`
+    Age  int    `json:"age" unstruct:"basic"`
+    City string `json:"city" unstruct:"basic"`
+}
+
+// Get typed data automatically:
+person, err := u.Unstruct(ctx, text)
+// Result: Person{Name: "John Doe", Age: 25, City: "New York"}
+```
+
 ## Features
 
 - **Intelligent Batching**: Groups fields with the same prompt for efficient processing
