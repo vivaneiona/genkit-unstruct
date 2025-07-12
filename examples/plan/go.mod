@@ -6,6 +6,8 @@ toolchain go1.24.3
 
 replace github.com/vivaneiona/genkit-unstruct => ../..
 
+require github.com/vivaneiona/genkit-unstruct v0.202507.1
+
 require (
 	cloud.google.com/go v0.120.0 // indirect
 	cloud.google.com/go/auth v0.16.2 // indirect
@@ -20,7 +22,6 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24 // indirect
 	github.com/tyler-sommer/stick v1.0.6 // indirect
-	github.com/vivaneiona/genkit-unstruct v0.202507.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
 	go.opentelemetry.io/otel v1.36.0 // indirect
