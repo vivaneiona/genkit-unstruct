@@ -125,7 +125,7 @@ func TestFormatAsText(t *testing.T) {
 		"NameExtractionPrompt",
 		"AgeExtractionPrompt",
 		"cost=",
-		"tokens=",
+		"tokens(in=",
 	}
 
 	for _, expected := range expectedStrings {
@@ -247,7 +247,7 @@ func TestTokenEstimation(t *testing.T) {
 func TestDefaultModelPricing(t *testing.T) {
 	pricing := DefaultModelPricing()
 
-	expectedModels := []string{"gpt-4", "gpt-3.5-turbo", "claude-3-sonnet"}
+	expectedModels := []string{"gpt-4o", "gpt-3.5-turbo", "claude-3-sonnet"}
 
 	for _, model := range expectedModels {
 		if price, exists := pricing[model]; !exists {

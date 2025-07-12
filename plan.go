@@ -3,7 +3,6 @@ package unstruct
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 )
 
@@ -18,6 +17,8 @@ const (
 )
 
 // PlanNode represents a node in the Unstructor execution plan.
+// Warning: Children and Metadata are exported for extensibility but should not be
+// modified after plan generation to maintain internal consistency.
 type PlanNode struct {
 	Type         PlanNodeType           `json:"type"`                   // e.g. "SchemaAnalysis", "PromptCall", ...
 	PromptName   string                 `json:"promptName,omitempty"`   // Name/identifier of the prompt (if applicable)
@@ -55,6 +56,7 @@ const (
 )
 
 // PlanBuilder is responsible for constructing execution plans.
+// Note: PlanBuilder is not thread-safe. Create separate instances for concurrent use.
 type PlanBuilder struct {
 	schema       interface{}
 	promptConfig map[string]interface{}
@@ -109,7 +111,10 @@ func (pb *PlanBuilder) buildPlan(options ExplainOptions) (*PlanNode, error) {
 	}
 
 	// Extract fields from schema (simplified - this would be more complex in reality)
-	fields := pb.extractFieldsFromSchema()
+	fields, err := pb.extractFieldsFromSchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract fields from schema: %w", err)
+	}
 
 	// Create root SchemaAnalysis node
 	rootNode := &PlanNode{
@@ -121,10 +126,8 @@ func (pb *PlanBuilder) buildPlan(options ExplainOptions) (*PlanNode, error) {
 	}
 
 	// Create PromptCall nodes for each field
-	promptNodes := make([]*PlanNode, 0)
 	for _, field := range fields {
 		promptNode := pb.createPromptCallNode(field, options)
-		promptNodes = append(promptNodes, promptNode)
 		rootNode.Children = append(rootNode.Children, promptNode)
 	}
 
@@ -147,12 +150,15 @@ func (pb *PlanBuilder) buildPlan(options ExplainOptions) (*PlanNode, error) {
 }
 
 // extractFieldsFromSchema extracts field names from the schema.
-func (pb *PlanBuilder) extractFieldsFromSchema() []string {
+func (pb *PlanBuilder) extractFieldsFromSchema() ([]string, error) {
 	// Try to extract fields from the schema map
 	if schemaMap, ok := pb.schema.(map[string]interface{}); ok {
 		if fields, exists := schemaMap["fields"]; exists {
 			if fieldSlice, ok := fields.([]string); ok {
-				return fieldSlice
+				if len(fieldSlice) == 0 {
+					return nil, fmt.Errorf("schema contains empty 'fields' array")
+				}
+				return fieldSlice, nil
 			}
 			// Handle []interface{} case
 			if fieldInterface, ok := fields.([]interface{}); ok {
@@ -160,14 +166,20 @@ func (pb *PlanBuilder) extractFieldsFromSchema() []string {
 				for i, field := range fieldInterface {
 					if fieldStr, ok := field.(string); ok {
 						result[i] = fieldStr
+					} else {
+						return nil, fmt.Errorf("schema field at index %d is not a string", i)
 					}
 				}
-				return result
+				if len(result) == 0 {
+					return nil, fmt.Errorf("schema contains empty 'fields' array")
+				}
+				return result, nil
 			}
+			return nil, fmt.Errorf("schema 'fields' is not a string array")
 		}
+		return nil, fmt.Errorf("schema missing 'fields' key")
 	}
-	// Fallback - simplified implementation for testing
-	return []string{"Name", "Age", "Address", "Email"}
+	return nil, fmt.Errorf("schema is not a map or unsupported type")
 }
 
 // estimateSchemaTokens estimates the token count for schema analysis.
@@ -184,7 +196,7 @@ func (pb *PlanBuilder) estimateSchemaTokens(fields []string) int {
 // createPromptCallNode creates a PromptCall node for a specific field.
 func (pb *PlanBuilder) createPromptCallNode(field string, options ExplainOptions) *PlanNode {
 	model := pb.getModelForField(field)
-	promptName := fmt.Sprintf("%sExtractionPrompt", field)
+	promptName := pb.getPromptNameForField(field)
 
 	inputTokens := pb.estimatePromptTokens(field)
 	outputTokens := 0
@@ -204,6 +216,19 @@ func (pb *PlanBuilder) createPromptCallNode(field string, options ExplainOptions
 	}
 
 	return node
+}
+
+// getPromptNameForField returns the prompt name for a specific field, using promptConfig if available.
+func (pb *PlanBuilder) getPromptNameForField(field string) string {
+	if pb.promptConfig != nil {
+		if promptName, exists := pb.promptConfig[field]; exists {
+			if name, ok := promptName.(string); ok {
+				return name
+			}
+		}
+	}
+	// Default prompt name
+	return fmt.Sprintf("%sExtractionPrompt", field)
 }
 
 // getModelForField returns the model to use for a specific field.
@@ -310,13 +335,24 @@ func (pb *PlanBuilder) calculateActualCost(node *PlanNode, pricing map[string]Mo
 		return 0.0
 	}
 
+	if pricing == nil {
+		return 0.0
+	}
+
 	price, exists := pricing[node.Model]
 	if !exists {
 		return 0.0
 	}
 
 	inputCost := float64(node.InputTokens) * price.PromptTokCost / 1000.0
-	outputCost := float64(node.OutputTokens) * price.CompletionTokCost / 1000.0
+
+	// Ensure we have output tokens for cost calculation
+	outputTokens := node.OutputTokens
+	if outputTokens == 0 && len(node.Fields) > 0 {
+		outputTokens = pb.estimateOutputTokens(node.Fields[0])
+	}
+
+	outputCost := float64(outputTokens) * price.CompletionTokCost / 1000.0
 
 	return inputCost + outputCost
 }
@@ -333,6 +369,10 @@ func (pb *PlanBuilder) ExplainPretty(format FormatType) (string, error) {
 
 // ExplainPrettyWithCosts returns a human-readable formatted plan with costs.
 func (pb *PlanBuilder) ExplainPrettyWithCosts(format FormatType, pricing map[string]ModelPrice) (string, error) {
+	if pricing == nil {
+		return "", fmt.Errorf("pricing information is required for cost calculations")
+	}
+
 	plan, err := pb.ExplainWithCosts(pricing)
 	if err != nil {
 		return "", err
@@ -415,8 +455,13 @@ func (pb *PlanBuilder) formatNodeInfo(node *PlanNode) string {
 
 	details = append(details, fmt.Sprintf("cost=%.1f", node.EstCost))
 
-	if node.InputTokens > 0 {
-		details = append(details, fmt.Sprintf("tokens=%d", node.InputTokens))
+	// Display token information more clearly
+	if node.InputTokens > 0 || node.OutputTokens > 0 {
+		if node.OutputTokens > 0 {
+			details = append(details, fmt.Sprintf("tokens(in=%d,out=%d)", node.InputTokens, node.OutputTokens))
+		} else {
+			details = append(details, fmt.Sprintf("tokens(in=%d)", node.InputTokens))
+		}
 	}
 
 	if len(node.Fields) > 0 {
@@ -495,19 +540,28 @@ func (pb *PlanBuilder) formatGraphvizNodeLabel(node *PlanNode) string {
 	var parts []string
 
 	if node.PromptName != "" {
-		parts = append(parts, fmt.Sprintf("%s: %s", node.Type, node.PromptName))
+		// Escape quotes and backslashes for Graphviz
+		escapedPrompt := strings.ReplaceAll(strings.ReplaceAll(node.PromptName, `\`, `\\`), `"`, `\"`)
+		parts = append(parts, fmt.Sprintf("%s: %s", node.Type, escapedPrompt))
 	} else {
 		parts = append(parts, string(node.Type))
 	}
 
 	if node.Model != "" {
-		parts = append(parts, fmt.Sprintf("model: %s", node.Model))
+		// Escape quotes and backslashes for Graphviz
+		escapedModel := strings.ReplaceAll(strings.ReplaceAll(node.Model, `\`, `\\`), `"`, `\"`)
+		parts = append(parts, fmt.Sprintf("model: %s", escapedModel))
 	}
 
 	parts = append(parts, fmt.Sprintf("cost=%.1f", node.EstCost))
 
 	if len(node.Fields) > 0 && len(node.Fields) <= 2 {
-		parts = append(parts, fmt.Sprintf("fields: %s", strings.Join(node.Fields, ", ")))
+		// Escape field names as well
+		escapedFields := make([]string, len(node.Fields))
+		for i, field := range node.Fields {
+			escapedFields[i] = strings.ReplaceAll(strings.ReplaceAll(field, `\`, `\\`), `"`, `\"`)
+		}
+		parts = append(parts, fmt.Sprintf("fields: %s", strings.Join(escapedFields, ", ")))
 	} else if len(node.Fields) > 2 {
 		parts = append(parts, fmt.Sprintf("fields: %d", len(node.Fields)))
 	}
@@ -546,40 +600,33 @@ func (pb *PlanBuilder) formatAsHTML(plan *PlanNode) string {
 	return sb.String()
 }
 
-// DefaultModelPricing provides default pricing for common models.
+// DefaultModelPricing returns current input/output token costs (USD / 1K tokens).
 func DefaultModelPricing() map[string]ModelPrice {
 	return map[string]ModelPrice{
-		"gpt-4": {
-			PromptTokCost:     0.03, // $30 per 1M tokens
-			CompletionTokCost: 0.06, // $60 per 1M tokens
-		},
-		"gpt-4-turbo": {
-			PromptTokCost:     0.01, // $10 per 1M tokens
-			CompletionTokCost: 0.03, // $30 per 1M tokens
-		},
-		"gpt-3.5-turbo": {
-			PromptTokCost:     0.002, // $2 per 1M tokens
-			CompletionTokCost: 0.002, // $2 per 1M tokens
-		},
-		"claude-3-sonnet": {
-			PromptTokCost:     0.003, // $3 per 1M tokens
-			CompletionTokCost: 0.015, // $15 per 1M tokens
-		},
-		"claude-3-haiku": {
-			PromptTokCost:     0.00025, // $0.25 per 1M tokens
-			CompletionTokCost: 0.00125, // $1.25 per 1M tokens
-		},
+		"gpt-4o":        {PromptTokCost: 0.0050, CompletionTokCost: 0.0200}, // $5 / M in, $20 / M out (https://openai.com/api/pricing/)
+		"gpt-4o-mini":   {PromptTokCost: 0.0006, CompletionTokCost: 0.0024}, // $0.60 / M in, $2.40 / M out  (https://openai.com/api/pricing/)
+		"gpt-4.1":       {PromptTokCost: 0.0020, CompletionTokCost: 0.0080}, // $2 / M in,  $8 / M out   (https://openai.com/api/pricing/)
+		"gpt-4.1-mini":  {PromptTokCost: 0.0004, CompletionTokCost: 0.0016}, // $0.40 / M in, $1.60 / M out  (https://openai.com/api/pricing/)
+		"gpt-3.5-turbo": {PromptTokCost: 0.0005, CompletionTokCost: 0.0015}, // $0.50 / M in, $1.50 / M out
+
+		"gemini-2.5-pro":   {PromptTokCost: 0.00125, CompletionTokCost: 0.0100}, // $1.25 / M in, $10 / M out  (https://cloud.google.com/vertex-ai/generative-ai/pricing)
+		"gemini-2.5-flash": {PromptTokCost: 0.00030, CompletionTokCost: 0.0025}, // $0.30 / M in, $2.50 / M out
+		"gemini-2.0-flash": {PromptTokCost: 0.00015, CompletionTokCost: 0.0006}, // $0.15 / M in, $0.60 / M out
+
+		"claude-3-opus":   {PromptTokCost: 0.0150, CompletionTokCost: 0.0750}, // $15 / M in, $75 / M out  [oai_citation:8‡Anthropic](https://docs.anthropic.com/en/docs/about-claude/pricing)
+		"claude-3-sonnet": {PromptTokCost: 0.0030, CompletionTokCost: 0.0150}, // $3 / M in,  $15 / M out  [oai_citation:9‡Anthropic](https://docs.anthropic.com/en/docs/about-claude/pricing)
+		"claude-3-haiku":  {PromptTokCost: 0.0008, CompletionTokCost: 0.0040}, // $0.80 / M in, $4 / M out   [oai_citation:10‡Anthropic](https://docs.anthropic.com/en/docs/about-claude/pricing)
 	}
 }
 
 // EstimateTokensFromText provides a rough token estimate from text length.
 func EstimateTokensFromText(text string) int {
 	// Rough heuristic: ~4 characters per token for English text
-	return int(math.Ceil(float64(len(text)) / 4.0))
+	return (len(text) + 3) / 4
 }
 
 // EstimateTokensFromWords provides a rough token estimate from word count.
 func EstimateTokensFromWords(wordCount int) int {
 	// Rough heuristic: ~1.3 tokens per word
-	return int(math.Ceil(float64(wordCount) * 1.3))
+	return (wordCount*13 + 9) / 10
 }
