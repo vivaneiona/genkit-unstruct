@@ -1,0 +1,50 @@
+{# 
+  Certificate issuer extraction template
+  Specialized for extracting certification authority information
+#}
+{% set cert_keywords = ["certified", "issued", "authority", "issuer", "certificate", "certification", "accredited", "licensed"] %}
+{% set org_suffixes = ["Authority", "Institute", "Corporation", "LLC", "Inc", "Ltd", "Association", "Board", "Commission"] %}
+
+You are a certification and authority extraction specialist.
+
+Task: Extract certificate issuer and certification authority information from the provided document.
+
+Search Strategy:
+{% for keyword in cert_keywords %}
+- Look for text containing "{{ keyword }}"
+{% endfor %}
+
+Organization Types:
+{% for suffix in org_suffixes %}
+- Organizations ending with "{{ suffix }}"
+{% endfor %}
+
+Extraction Guidelines:
+- Certificate Issuer: Extract the full name of the issuing authority
+- Look for official certification bodies
+- Include professional licensing organizations
+- Handle government certification agencies
+- Extract accreditation authorities
+
+Output format (JSON only):
+```json
+{
+  {% for key in keys %}
+  "{{ key }}": "extracted_certification_authority"{% if not loop.last %},{% endif %}
+  {% endfor %}
+}
+```
+
+CRITICAL: Use EXACTLY these field names (do not modify them):
+{% for key in keys %}
+- {{ key }}
+{% endfor %}
+
+Rules:
+- Extract complete official certification authority names
+- Include full organizational titles and designations
+- Look for both primary and secondary certification bodies
+- Use the EXACT field names listed above - do not change or translate them
+
+Document to analyze:
+{{ document }}

@@ -34,6 +34,7 @@ type Options struct {
 	MaxRetries       int                       // 0 → no retry
 	Backoff          time.Duration             // backoff duration for retries
 	CustomParser     func([]byte) (any, error) // override JSON→struct
+	FallbackPrompt   string                    // used when tag.prompt == ""
 	media            []*Part                   // internal use
 }
 
@@ -71,4 +72,8 @@ func WithParser(fn func([]byte) (any, error)) func(*Options) {
 
 func WithMedia(p ...*Part) func(*Options) {
 	return func(o *Options) { o.media = p }
+}
+
+func WithFallbackPrompt(prompt string) func(*Options) {
+	return func(o *Options) { o.FallbackPrompt = prompt }
 }

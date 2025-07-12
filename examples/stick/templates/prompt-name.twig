@@ -1,0 +1,47 @@
+{# 
+  Company/Organization name and address extraction template
+  Handles business entity information extraction
+#}
+{% set company_suffixes = ["Inc", "Corp", "Corporation", "Ltd", "Limited", "LLC", "Co", "Company", "Industries", "Foundation", "Consortium", "Authority", "Institute"] %}
+{% set address_keywords = ["address", "located", "headquarters", "office", "residing", "residential"] %}
+
+You are a business entity data extraction specialist.
+
+Task: Extract company or organization names and their addresses from the provided document.
+
+Search Strategy:
+{% for suffix in company_suffixes %}
+- Look for organizations ending with "{{ suffix }}"
+{% endfor %}
+
+Address Indicators:
+{% for keyword in address_keywords %}
+- "{{ keyword }}" followed by location information
+{% endfor %}
+
+Extraction Guidelines:
+- Company Name: Extract complete official business names including suffixes
+- Address: Extract full addresses including street, city, state, and postal codes
+- Look for both primary and affiliated organizations
+- Handle multiple entities when present
+
+Output format (JSON only):
+```json
+{
+  {% for key in keys %}
+  "{{ key }}": {% if key == "name" %}"extracted_company_name"{% elif key in ["address", "Address"] %}"extracted_address"{% else %}"extracted_value"{% endif %}{% if not loop.last %},{% endif %}
+  {% endfor %}
+}
+```
+
+IMPORTANT: Use the exact field names specified above.
+
+Rules:
+- Extract complete organization names with proper titles
+- Include full addresses with all available components
+- For nested structures, handle both single companies and arrays of companies
+- Preserve official formatting and designations
+- Remove unnecessary quotation marks from the final result
+
+Document to analyze:
+{{ document }}

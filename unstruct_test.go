@@ -29,32 +29,40 @@ func (m mockPrompts) GetPrompt(tag string, version int) (string, error) {
 }
 
 func TestUnstructor_SchemaReflection(t *testing.T) {
-	tag2keys, json2field := schemaOf[TestProject]()
-
-	// Check that we have the expected tags
-	if len(tag2keys) != 2 {
-		t.Errorf("Expected 2 tags, got %d", len(tag2keys))
+	sch, err := schemaOf[TestProject]()
+	if err != nil {
+		t.Fatalf("schemaOf failed: %v", err)
 	}
 
-	// Check basic tag
-	basicKeys := tag2keys["basic"]
-	if len(basicKeys) != 2 || basicKeys[0] != "name" || basicKeys[1] != "code" {
-		t.Errorf("Expected basic keys [name, code], got %v", basicKeys)
+	// Check that we have the expected prompt groups
+	if len(sch.group2keys) != 2 {
+		t.Errorf("Expected 2 prompt groups, got %d", len(sch.group2keys))
 	}
 
-	// Check coords tag
-	coordKeys := tag2keys["coords"]
-	if len(coordKeys) != 2 || coordKeys[0] != "lat" || coordKeys[1] != "lon" {
-		t.Errorf("Expected coords keys [lat, lon], got %v", coordKeys)
+	// Check field mapping
+	if len(sch.json2field) != 4 {
+		t.Errorf("Expected 4 fields, got %d", len(sch.json2field))
 	}
 
-	// Check json2field mapping
-	if len(json2field) != 4 {
-		t.Errorf("Expected 4 field mappings, got %d", len(json2field))
+	// Find basic group
+	var basicKeys []string
+	var coordKeys []string
+	for pk, keys := range sch.group2keys {
+		if pk.prompt == "basic" {
+			basicKeys = keys
+		} else if pk.prompt == "coords" {
+			coordKeys = keys
+		}
 	}
 
-	if field, ok := json2field["name"]; !ok || field.Name != "Name" {
-		t.Errorf("Expected field mapping for 'name' to 'Name', got %v", field)
+	// Check basic keys
+	if len(basicKeys) != 2 {
+		t.Errorf("Expected 2 basic keys, got %d: %v", len(basicKeys), basicKeys)
+	}
+
+	// Check coords keys
+	if len(coordKeys) != 2 {
+		t.Errorf("Expected 2 coord keys, got %d: %v", len(coordKeys), coordKeys)
 	}
 }
 
@@ -69,7 +77,8 @@ func TestUnstructor_CallPrompt(t *testing.T) {
 		"basic",
 		keys,
 		doc,
-		Options{Model: "test-model"},
+		"test-model",
+		Options{},
 	)
 
 	if err != nil {

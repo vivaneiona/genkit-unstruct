@@ -1,63 +1,90 @@
 package unstruct
 
 import (
-	"log/slog"
+	"fmt"
 	"reflect"
 	"strings"
-	"sync"
+	"time"
 )
 
-var schemaCache sync.Map
+const unstractTag = "unstruct"
 
-type cachedSchema struct {
-	tag2keys   map[string][]string
-	json2field map[string]reflect.StructField
+type promptKey struct {
+	prompt     string // explicit label or ""
+	parentPath string // dotted path w/o the leaf field
 }
 
-const tagName = "extractor"
+type fieldSpec struct {
+	jsonKey string
+	model   string // may be ""
+	index   []int  // reflect path
+}
 
-func schemaOf[T any]() (map[string][]string, map[string]reflect.StructField) {
+type schema struct {
+	group2keys map[promptKey][]string // batching groups
+	json2field map[string]fieldSpec   // merge map
+}
+
+func schemaOf[T any]() (*schema, error) {
 	var zero T
 	rt := reflect.TypeOf(zero)
-	typeName := rt.String()
-	slog.Debug("Analyzing type", "type", typeName, "kind", rt.Kind())
-
-	if rt.Kind() == reflect.Pointer {
-		rt = rt.Elem()
-		slog.Debug("Dereferenced pointer", "elem_type", rt.String())
+	if rt.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("unstruct: T must be struct")
 	}
 
-	if v, ok := schemaCache.Load(rt); ok {
-		s := v.(cachedSchema)
-		slog.Debug("Cache hit", "type", rt.String(), "tag_count", len(s.tag2keys), "field_count", len(s.json2field))
-		return s.tag2keys, s.json2field
+	s := &schema{
+		group2keys: map[promptKey][]string{},
+		json2field: map[string]fieldSpec{},
 	}
 
-	slog.Debug("Cache miss, analyzing struct", "type", rt.String())
-	tag2keys := map[string][]string{}
-	json2field := map[string]reflect.StructField{}
+	var walk func(t reflect.Type, parent, inheritedPrompt string, idx []int)
+	walk = func(t reflect.Type, parent, inheritedPrompt string, idx []int) {
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			if f.Anonymous || !f.IsExported() {
+				continue
+			}
+			jsonKey := strings.Split(f.Tag.Get("json"), ",")[0]
+			if jsonKey == "-" {
+				continue
+			}
+			if jsonKey == "" {
+				jsonKey = f.Name
+			}
+			fullKey := joinKey(parent, jsonKey)
+			tp := parseUnstructTag(f.Tag.Get("unstruct"), inheritedPrompt)
 
-	fieldCount := rt.NumField()
-	slog.Debug("Iterating fields", "field_count", fieldCount)
+			nextIdx := append(idx, i)
+			if isPureStruct(f.Type) {
+				walk(f.Type, fullKey, tp.prompt, nextIdx)
+				continue
+			}
 
-	for i := 0; i < fieldCount; i++ {
-		f := rt.Field(i)
-		jsonKey, _, _ := strings.Cut(f.Tag.Get("json"), ",") // strip modifiers
-		if jsonKey == "" {
-			slog.Debug("skipping field without json tag", "field_name", f.Name)
-			continue
+			// Handle slices of structs
+			if f.Type.Kind() == reflect.Slice && isPureStruct(f.Type.Elem()) {
+				walk(f.Type.Elem(), fullKey, tp.prompt, nextIdx)
+				continue
+			}
+
+			pk := promptKey{prompt: tp.prompt, parentPath: parent}
+			s.group2keys[pk] = append(s.group2keys[pk], fullKey)
+			s.json2field[fullKey] = fieldSpec{
+				jsonKey: fullKey, model: tp.model, index: nextIdx,
+			}
 		}
-		tag := f.Tag.Get(tagName)
-		if tag == "" {
-			tag = "default"
-		}
-		slog.Debug("Processed field", "field_name", f.Name, "json_key", jsonKey, "extractor_tag", tag)
-		tag2keys[tag] = append(tag2keys[tag], jsonKey)
-		json2field[jsonKey] = f
 	}
+	walk(rt, "", "", nil)
+	return s, nil
+}
 
-	s := cachedSchema{tag2keys, json2field}
-	schemaCache.Store(rt, s)
-	slog.Debug("Cached schema", "type", rt.String(), "tag_count", len(s.tag2keys), "field_count", len(s.json2field))
-	return s.tag2keys, s.json2field
+// helpers
+func joinKey(parent, child string) string {
+	if parent == "" {
+		return child
+	}
+	return parent + "." + child
+}
+
+func isPureStruct(t reflect.Type) bool {
+	return t.Kind() == reflect.Struct && t != reflect.TypeOf(time.Time{})
 }

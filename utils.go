@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // buildPrompt constructs the final prompt from template, keys, and document
@@ -25,48 +26,33 @@ func buildPrompt(tpl string, keys []string, doc string) string {
 	return finalPrompt
 }
 
-// patchStruct merges JSON data into the destination struct using field mapping
-func patchStruct[T any](
-	dst *T,
-	raw []byte,
-	fieldDict map[string]reflect.StructField,
-) error {
-	slog.Debug("Starting JSON merge", "raw_length", len(raw), "field_dict_size", len(fieldDict), "raw_preview", string(raw)[:min(200, len(raw))])
+// patchStruct merges JSON data into the destination struct using dotted keys support
+func patchStruct[T any](dst *T, raw []byte, spec map[string]fieldSpec) error {
+	slog.Debug("Starting JSON merge", "raw_length", len(raw), "spec_size", len(spec))
 
-	sanitized := SanitizeJSONResponse(raw)
-	slog.Debug("Sanitized JSON", "sanitized_length", len(sanitized))
-
-	var kv map[string]json.RawMessage
-	if err := json.Unmarshal(sanitized, &kv); err != nil {
-		slog.Debug("JSON unmarshal failed", "error", err, "sanitized_json", string(sanitized))
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		slog.Debug("JSON unmarshal failed", "error", err)
 		return err
 	}
-	slog.Debug("Unmarshaled JSON", "key_count", len(kv))
+	slog.Debug("Unmarshaled JSON", "key_count", len(m))
 
-	rv := reflect.ValueOf(dst).Elem()
-	patchedFields := 0
-	for key, b := range kv {
-		slog.Debug("Processing key", "key", key, "value_length", len(b))
-		f, ok := fieldDict[key]
-		if !ok || len(b) == 0 {
-			slog.Debug("Skipping key", "key", key, "field_found", ok, "value_empty", len(b) == 0)
+	for key, data := range m {
+		fs, ok := spec[key]
+		if !ok {
+			slog.Debug("Field spec not found", "key", key)
 			continue
 		}
-		fv := rv.FieldByIndex(f.Index)
-		if !fv.CanSet() {
-			slog.Debug("Field not settable", "key", key, "field_name", f.Name)
-			continue
+		v := reflect.ValueOf(dst).Elem()
+		for _, idx := range fs.index {
+			v = v.Field(idx)
 		}
-		ptr := reflect.New(f.Type)
-		if err := json.Unmarshal(b, ptr.Interface()); err != nil {
-			slog.Debug("Field unmarshal failed", "key", key, "field_name", f.Name, "error", err)
-			return fmt.Errorf("field %s: %w", key, err)
+		if err := json.Unmarshal(data, v.Addr().Interface()); err != nil {
+			slog.Debug("Field unmarshal failed", "key", key, "error", err)
+			return fmt.Errorf("%s: %w", key, err)
 		}
-		fv.Set(ptr.Elem())
-		patchedFields++
-		slog.Debug("Patched field", "key", key, "field_name", f.Name)
+		slog.Debug("Patched field", "key", key)
 	}
-	slog.Debug("Completed JSON merge", "patched_fields", patchedFields)
 	return nil
 }
 
@@ -88,4 +74,30 @@ func SanitizeJSONResponse(b []byte) []byte {
 	slog.Debug("Sanitization complete", "original_length", originalLen, "final_length", len(finalS), "removed_prefixes_suffixes", originalLen != len(finalS))
 
 	return []byte(finalS)
+}
+
+// retryable executes a function with exponential backoff retry logic
+func retryable(call func() error, max int, backoff time.Duration, log *slog.Logger) error {
+	if max == 0 {
+		return call() // no retry
+	}
+
+	delay := backoff
+	for i := 0; i <= max; i++ {
+		if err := call(); err != nil {
+			if i == max {
+				log.Debug("Final attempt failed", "attempt", i+1, "error", err)
+				return err
+			}
+			log.Debug("Attempt failed, retrying", "attempt", i+1, "error", err, "delay", delay)
+			time.Sleep(delay)
+			delay *= 2
+			continue
+		}
+		if i > 0 {
+			log.Debug("Attempt succeeded", "attempt", i+1)
+		}
+		return nil
+	}
+	return nil
 }

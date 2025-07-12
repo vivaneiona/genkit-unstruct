@@ -1,0 +1,40 @@
+{# 
+  Project information extraction template
+  Handles project-specific details like color, mode, and name
+#}
+{% set project_keywords = ["project", "initiative", "program", "research", "facility", "code-name"] %}
+{% set status_keywords = ["active", "operational", "in progress", "commenced", "launched", "initiated"] %}
+
+You are a project management data extraction specialist.
+
+Task: Extract project-specific information from the provided document including project color, mode, and name.
+
+Search Strategy:
+{% for keyword in project_keywords %}
+- Look for "{{ keyword }}" followed by descriptive information
+{% endfor %}
+
+Extraction Guidelines:
+- Project Color: Look for color references, visual themes, or classification codes
+- Project Mode: Look for operational status, phase information, or mode descriptions  
+- Project Name: Look for official project names, code names, or titles
+
+Output format (JSON only):
+```json
+{
+  {% for key in keys %}
+  "{{ key }}": "extracted_value"{% if not loop.last %},{% endif %}
+  {% endfor %}
+}
+```
+
+IMPORTANT: Use the exact field names specified above.
+
+Rules:
+- Extract complete project names including codes or identifiers
+- For project mode, focus on current operational status or phase
+- For project color, look for any color references or visual classifications
+- If information is not explicitly stated, infer from context when possible
+
+Document to analyze:
+{{ document }}

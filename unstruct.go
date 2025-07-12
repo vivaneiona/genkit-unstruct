@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/genai"
@@ -183,6 +182,7 @@ func (x *Unstructor[T]) Unstruct(
 	}
 
 	var opts Options
+	opts.FallbackPrompt = "default" // Set default fallback prompt
 	for _, fn := range optFns {
 		fn(&opts)
 	}
@@ -212,31 +212,40 @@ func (x *Unstructor[T]) Unstruct(
 		egCtx = d.ctx
 	}
 
-	// 1. Cached schema → tag→keys, json→field map.
-	tag2keys, json2field := schemaOf[T]()
-	x.log.Debug("Analyzed schema", "tag_count", len(tag2keys), "field_count", len(json2field))
+	// 1. Get new schema with grouping logic
+	sch, err := schemaOf[T]()
+	if err != nil {
+		return nil, fmt.Errorf("schema analysis failed: %w", err)
+	}
+	x.log.Debug("Analyzed schema", "group_count", len(sch.group2keys), "field_count", len(sch.json2field))
 
-	// 2. Fan-out prompt calls.
+	// 2. Fan-out prompt calls with improved grouping and model-specific handling.
 	type frag struct {
-		tag string
-		raw []byte
+		prompt string
+		raw    []byte
+		model  string
 	}
 	var (
 		mu        sync.Mutex
-		fragments = make([]frag, 0, len(tag2keys))
+		fragments = make([]frag, 0, len(sch.group2keys))
 	)
 
-	x.log.Debug("Starting concurrent prompt calls", "prompt_count", len(tag2keys))
-	for tag, keys := range tag2keys {
-		tag, keys := tag, keys // loop capture
+	x.log.Debug("Starting concurrent prompt calls", "prompt_count", len(sch.group2keys))
+	for pk, keys := range sch.group2keys {
+		pk, keys := pk, keys // loop capture
 		r.Go(func() error {
-			raw, err := x.callPrompt(egCtx, tag, keys, doc, opts)
+			model := opts.Model
+			if len(keys) == 1 {
+				if m := sch.json2field[keys[0]].model; m != "" {
+					model = m
+				}
+			}
+			raw, err := x.callPrompt(egCtx, pk.prompt, keys, doc, model, opts)
 			if err != nil {
-				x.log.Debug("Prompt call failed", "tag", tag, "error", err)
-				return fmt.Errorf("%s: %w", tag, err)
+				return fmt.Errorf("%s: %w", pk.prompt, err)
 			}
 			mu.Lock()
-			fragments = append(fragments, frag{tag, raw})
+			fragments = append(fragments, frag{pk.prompt, raw, model})
 			mu.Unlock()
 			return nil
 		})
@@ -248,13 +257,13 @@ func (x *Unstructor[T]) Unstruct(
 	}
 	x.log.Debug("All prompt calls completed", "fragment_count", len(fragments))
 
-	// 3. Merge JSON fragments back into a single struct.
+	// 3. Merge JSON fragments back into a single struct using new patcher.
 	var out T
 	x.log.Debug("Starting JSON fragment merge", "fragment_count", len(fragments))
 	for _, f := range fragments {
-		if err := patchStruct(&out, f.raw, json2field); err != nil {
-			x.log.Debug("Merge failed", "tag", f.tag, "error", err)
-			return nil, fmt.Errorf("merge %q: %w", f.tag, err)
+		if err := patchStruct(&out, f.raw, sch.json2field); err != nil {
+			x.log.Debug("Merge failed", "prompt", f.prompt, "error", err)
+			return nil, fmt.Errorf("merge %q: %w", f.prompt, err)
 		}
 	}
 
@@ -338,32 +347,6 @@ func (x *Unstructor[T]) Stream(
 	return nil
 }
 
-// retryable executes a function with exponential backoff retry logic
-func retryable(call func() error, max int, backoff time.Duration, log *slog.Logger) error {
-	if max == 0 {
-		return call() // no retry
-	}
-
-	delay := backoff
-	for i := 0; i <= max; i++ {
-		if err := call(); err != nil {
-			if i == max {
-				log.Debug("Final attempt failed", "attempt", i+1, "error", err)
-				return err
-			}
-			log.Debug("Attempt failed, retrying", "attempt", i+1, "error", err, "delay", delay)
-			time.Sleep(delay)
-			delay *= 2
-			continue
-		}
-		if i > 0 {
-			log.Debug("Attempt succeeded", "attempt", i+1)
-		}
-		return nil
-	}
-	return nil
-}
-
 // genkitInvoker implements the Invoker interface using Google GenAI
 type genkitInvoker struct {
 	client *genai.Client
@@ -391,19 +374,26 @@ func (gv *genkitInvoker) Generate(
 	)
 }
 
-// callPrompt invokes a single prompt template and returns raw JSON bytes.
+// callPrompt invokes a single prompt template with a specific model and returns raw JSON bytes.
 func (x *Unstructor[T]) callPrompt(
 	ctx context.Context,
-	tag string,
+	promptLabel string,
 	keys []string,
 	doc string,
+	model string,
 	opts Options,
 ) ([]byte, error) {
-	x.log.Debug("Calling prompt", "tag", tag, "keys", keys)
+	// label may be empty → fallback
+	label := promptLabel
+	if label == "" {
+		label = opts.FallbackPrompt
+	}
 
-	tpl, err := x.prompts.GetPrompt(tag, 1)
+	x.log.Debug("Calling prompt", "label", label, "keys", keys, "model", model)
+
+	tpl, err := x.prompts.GetPrompt(label, 1)
 	if err != nil {
-		x.log.Debug("Failed to get prompt template", "tag", tag, "error", err)
+		x.log.Debug("Failed to get prompt template", "label", label, "error", err)
 		return nil, err
 	}
 
@@ -412,9 +402,9 @@ func (x *Unstructor[T]) callPrompt(
 	var result []byte
 	err = retryable(func() error {
 		var genErr error
-		result, genErr = x.invoker.Generate(ctx, Model(opts.Model), prompt, opts.media)
+		result, genErr = x.invoker.Generate(ctx, Model(model), prompt, opts.media)
 		if genErr != nil {
-			x.log.Debug("Generate failed", "tag", tag, "error", genErr)
+			x.log.Debug("Generate failed", "label", label, "model", model, "error", genErr)
 		}
 		return genErr
 	}, opts.MaxRetries, opts.Backoff, x.log)

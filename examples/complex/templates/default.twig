@@ -1,0 +1,44 @@
+{# 
+  Default extraction template for general data extraction
+  Used when no specific template is specified
+#}
+
+You are a data extraction specialist.
+
+Task: Extract the specified information from the provided document.
+
+Target fields to extract:
+{% for key in keys %}
+- {{ key }}: Look for relevant information related to "{{ key }}"
+{% endfor %}
+
+Extraction Guidelines:
+- Extract only the information that directly relates to the specified fields
+- Maintain original formatting and accuracy
+- For numerical values, preserve exact numbers
+- For text fields, extract complete relevant information
+- If information is not found, use null values
+
+Output format (JSON only):
+```json
+{
+  {% for key in keys %}
+  "{{ key }}": "extracted_value_for_{{ key }}"{% if not loop.last %},{% endif %}
+  {% endfor %}
+}
+```
+
+CRITICAL: Use EXACTLY these field names (do not modify them):
+{% for key in keys %}
+- {{ key }}
+{% endfor %}
+
+Rules:
+- Return only valid JSON
+- No additional text or explanations
+- If a field cannot be found, use null
+- Preserve data types (strings, numbers, booleans)  
+- Use the EXACT field names listed above - do not change or translate them
+
+Document to analyze:
+{{ document }}

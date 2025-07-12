@@ -8,6 +8,9 @@ mod? basic 'basic/.justfile'
 # Stick template engine example
 mod? stick 'stick/.justfile'
 
+# Stick template engine example
+mod? complex 'complex/.justfile'
+
 vet:
     #!/usr/bin/env bash
     for dir in */; do
