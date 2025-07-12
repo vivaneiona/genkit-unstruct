@@ -11,6 +11,9 @@ mod? stick 'stick/.justfile'
 # Stick template engine example
 mod? complex 'complex/.justfile'
 
+# Stick template engine example
+mod? plan 'plan/.justfile'
+
 vet:
     #!/usr/bin/env bash
     for dir in */; do

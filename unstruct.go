@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"sync"
 
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/genai"
 )
 
@@ -116,47 +115,6 @@ func GenerateBytes(ctx context.Context, client *genai.Client, log *slog.Logger, 
 	log.Debug("Generated content successfully", "response_length", len(part.Text))
 	return []byte(part.Text), nil
 }
-
-// GenerateOption represents options for generation
-type GenerateOption func(*generateConfig)
-
-type generateConfig struct {
-	ModelName string
-	Messages  []*Message
-}
-
-// WithModelName sets the model name
-func WithModelName(name string) GenerateOption {
-	return func(cfg *generateConfig) {
-		cfg.ModelName = name
-	}
-}
-
-// WithMessages sets the messages
-func WithMessages(messages ...*Message) GenerateOption {
-	return func(cfg *generateConfig) {
-		cfg.Messages = messages
-	}
-}
-
-// DefaultRunner returns the default implementation backed by errgroup.Group.
-func DefaultRunner(ctx context.Context) Runner {
-	return newErrGroupRunner(ctx)
-}
-
-// errGroupRunner is the default implementation backed by errgroup.Group.
-type errGroupRunner struct {
-	ctx context.Context // derived ctx shared by all tasks
-	eg  *errgroup.Group
-}
-
-func newErrGroupRunner(parent context.Context) *errGroupRunner {
-	eg, ctx := errgroup.WithContext(parent)
-	return &errGroupRunner{ctx: ctx, eg: eg}
-}
-
-func (r *errGroupRunner) Go(fn func() error) { r.eg.Go(fn) }
-func (r *errGroupRunner) Wait() error        { return r.eg.Wait() }
 
 // New returns a Unstructor that logs with slog.Default().
 func New[T any](client *genai.Client, p PromptProvider) *Unstructor[T] {
