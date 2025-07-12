@@ -90,7 +90,8 @@ func main() {
 	}
 	slog.Debug("Google AI client created successfully")
 
-	// 2. Prompts for each extractor tag
+	// 1. Prompts for each extractor tag ⭐️
+	// 1️⃣
 	slog.Debug("Setting up prompts", "prompt_count", 4)
 	prompts := filePrompts{
 		"code":      `Extract the project code from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON. Text: {{.Document}}`,
@@ -100,12 +101,14 @@ func main() {
 	}
 	slog.Debug("prompts configured", "code_prompt_length", len(prompts["code"]), "cert_prompt_length", len(prompts["cert"]), "default_prompt_length", len(prompts["default"]), "extractor_prompt_length", len(prompts["extractor"]))
 
-	// 3. Build unstructor
+	// 2. Build unstructor
+	// 2️⃣
 	slog.Debug("Creating Unstructor")
 	uno := unstruct.New[Project](client, prompts)
 	slog.Debug("Unstructor created successfully")
 
-	// 4. Run extraction
+	// 3. Run extraction
+	// 3️⃣
 	doc := `Station 512-B. Certificate by "MegaTel". Coords: 13.75, 100.52.`
 	fmt.Printf("Extracting information from document: %s\n", doc)
 	slog.Debug("Starting extraction", "document", doc, "model", "gemini-1.5-flash", "timeout", "30s")
