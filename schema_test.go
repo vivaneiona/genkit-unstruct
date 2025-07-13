@@ -687,3 +687,103 @@ func BenchmarkSchemaOf(b *testing.B) {
 		}
 	})
 }
+
+// Comprehensive test for all new syntax features
+type ComprehensiveSyntaxTest struct {
+	// Explicit prompt,model format
+	ExplicitField string `json:"explicit" unstruct:"extract_title,googleai/gemini-1.5-pro"`
+	
+	// Model-only with various providers
+	GoogleAIField   string `json:"googleai" unstruct:"model/googleai/gemini-1.5-flash"`
+	VertexField     string `json:"vertex" unstruct:"model/vertex/gemini-1.5-pro"`
+	AnthropicField  string `json:"anthropic" unstruct:"model/anthropic/claude-3-sonnet"`
+	OpenAIField     string `json:"openai" unstruct:"model/openai/gpt-4"`
+	CustomField     string `json:"custom" unstruct:"model/custom-provider/my-model-v2"`
+	
+	// Prompt-only formats
+	PromptPrefixField string `json:"prompt_prefix" unstruct:"prompt/special_extraction"`
+	PromptOnlyField   string `json:"prompt_only" unstruct:"basic_prompt"`
+	
+	// Nested structure with inheritance
+	NestedStruct struct {
+		InheritedField1 string `json:"inherited1"`                               // Inherits everything
+		InheritedField2 string `json:"inherited2"`                               // Inherits everything  
+		OverridePrompt  string `json:"override_prompt" unstruct:"new_prompt"`    // Override prompt only
+		OverrideModel   string `json:"override_model" unstruct:"model/new/model"` // Override model only
+	} `json:"nested" unstruct:"nested_extraction,vertex/gemini-1.5-flash"`
+	
+	// Empty tag (full inheritance)
+	EmptyTagField string `json:"empty_tag" unstruct:""`
+}
+
+func TestComprehensiveSyntax(t *testing.T) {
+	sch, err := schemaOf[ComprehensiveSyntaxTest]()
+	if err != nil {
+		t.Fatalf("schemaOf failed: %v", err)
+	}
+
+	testCases := []struct {
+		field          string
+		expectedPrompt string
+		expectedModel  string
+		description    string
+	}{
+		// Direct field tests
+		{"explicit", "extract_title", "googleai/gemini-1.5-pro", "explicit format"},
+		{"googleai", "", "googleai/gemini-1.5-flash", "googleai model"},
+		{"vertex", "", "vertex/gemini-1.5-pro", "vertex model"},
+		{"anthropic", "", "anthropic/claude-3-sonnet", "anthropic model"},
+		{"openai", "", "openai/gpt-4", "openai model"},
+		{"custom", "", "custom-provider/my-model-v2", "custom model"},
+		{"prompt_prefix", "special_extraction", "", "prompt/ prefix"},
+		{"prompt_only", "basic_prompt", "", "prompt only"},
+		{"empty_tag", "", "", "empty tag inheritance"},
+		
+		// Nested field tests
+		{"nested.inherited1", "nested_extraction", "vertex/gemini-1.5-flash", "nested inheritance"},
+		{"nested.inherited2", "nested_extraction", "vertex/gemini-1.5-flash", "nested inheritance"},
+		{"nested.override_prompt", "new_prompt", "vertex/gemini-1.5-flash", "override prompt, inherit model"},
+		{"nested.override_model", "nested_extraction", "new/model", "inherit prompt, override model"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			fieldSpec, exists := sch.json2field[tc.field]
+			if !exists {
+				t.Fatalf("Field %s should exist in schema", tc.field)
+			}
+
+			if fieldSpec.model != tc.expectedModel {
+				t.Errorf("Field %s: Expected model '%s', got '%s'", tc.field, tc.expectedModel, fieldSpec.model)
+			}
+
+			// Verify the field is in the correct prompt group
+			found := false
+			for pk, fields := range sch.group2keys {
+				if pk.prompt == tc.expectedPrompt && pk.model == tc.expectedModel {
+					for _, field := range fields {
+						if field == tc.field {
+							found = true
+							break
+						}
+					}
+					if found {
+						break
+					}
+				}
+			}
+			if !found {
+				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')", 
+					tc.field, tc.expectedPrompt, tc.expectedModel)
+			}
+		})
+	}    // Verify we have the expected number of distinct groups
+    expectedGroupCount := 12 // Count distinct (prompt, model) combinations
+    if len(sch.group2keys) != expectedGroupCount {
+		t.Errorf("Expected %d prompt groups, got %d", expectedGroupCount, len(sch.group2keys))
+		for pk, fields := range sch.group2keys {
+			t.Logf("Group: prompt='%s', model='%s', parentPath='%s', fields=%v", 
+				pk.prompt, pk.model, pk.parentPath, fields)
+		}
+	}
+}

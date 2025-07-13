@@ -13,7 +13,7 @@ type tagParts struct {
 // - "" → inherit from parent
 // - "PROMPTNAME,MODELNAME" → explicit prompt and model
 // - "model/{modelname}" → model-only format
-// - "prompt/{promptname}" → prompt-only format  
+// - "prompt/{promptname}" → prompt-only format
 // - "anything_else" → treated as prompt unless it looks like a model name
 func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 	if tag == "" {
@@ -57,13 +57,11 @@ func looksLikeModel(s string) bool {
 	if strings.Contains(s, "gemini") {
 		return true
 	}
-	
+
 	// Check for known provider prefixes with Gemini models
 	if strings.HasPrefix(s, "googleai/") || strings.HasPrefix(s, "vertex/") {
 		return true
 	}
-	
+
 	return false
 }
-
-
