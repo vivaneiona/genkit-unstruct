@@ -15,10 +15,10 @@ Instructions:
    - Any GPS or location references
 2. Convert all coordinates to decimal degrees
 3. Use positive values for North/East, negative for South/West
-4. Return as JSON with the exact field names: {{Keys|join(", ")}}
+4. Return as JSON with the exact field names: {% for key in keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
 Document to analyze:
-{{Document}}
+{{ document }}
 
 Example expected format:
 {"lat": 37.4419, "lon": -122.1430}

@@ -38,8 +38,8 @@ func schemaOf[T any]() (*schema, error) {
 		json2field: map[string]fieldSpec{},
 	}
 
-	var walk func(t reflect.Type, parent, inheritedPrompt string, idx []int)
-	walk = func(t reflect.Type, parent, inheritedPrompt string, idx []int) {
+	var walk func(t reflect.Type, parent, inheritedPrompt, inheritedModel string, idx []int)
+	walk = func(t reflect.Type, parent, inheritedPrompt, inheritedModel string, idx []int) {
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
 			if f.Anonymous || !f.IsExported() {
@@ -55,26 +55,32 @@ func schemaOf[T any]() (*schema, error) {
 			fullKey := joinKey(parent, jsonKey)
 			tp := parseUnstructTag(f.Tag.Get("unstruct"), inheritedPrompt)
 
+			// Inherit model if not specified in the tag
+			model := tp.model
+			if model == "" {
+				model = inheritedModel
+			}
+
 			nextIdx := append(idx, i)
 			if isPureStruct(f.Type) {
-				walk(f.Type, fullKey, tp.prompt, nextIdx)
+				walk(f.Type, fullKey, tp.prompt, model, nextIdx)
 				continue
 			}
 
 			// Handle slices of structs
 			if f.Type.Kind() == reflect.Slice && isPureStruct(f.Type.Elem()) {
-				walk(f.Type.Elem(), fullKey, tp.prompt, nextIdx)
+				walk(f.Type.Elem(), fullKey, tp.prompt, model, nextIdx)
 				continue
 			}
 
-			pk := promptKey{prompt: tp.prompt, parentPath: parent, model: tp.model}
+			pk := promptKey{prompt: tp.prompt, parentPath: parent, model: model}
 			s.group2keys[pk] = append(s.group2keys[pk], fullKey)
 			s.json2field[fullKey] = fieldSpec{
-				jsonKey: fullKey, model: tp.model, index: nextIdx,
+				jsonKey: fullKey, model: model, index: nextIdx,
 			}
 		}
 	}
-	walk(rt, "", "", nil)
+	walk(rt, "", "", "", nil)
 	return s, nil
 }
 

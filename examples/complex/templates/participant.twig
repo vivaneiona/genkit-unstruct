@@ -13,10 +13,10 @@ Instructions:
 2. Extract full names (including titles like Dr., Prof.)
 3. Extract complete addresses with street, city, state/province, postal codes
 4. Be thorough and accurate - this uses high-precision model
-5. Return as JSON with the exact field names: {{Keys|join(", ")}}
+5. Return as JSON with the exact field names: {% for key in keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
 Document to analyze:
-{{Document}}
+{{ document }}
 
 Example expected format:
 {"name": "Dr. Sarah Johnson", "address": "123 Tech Boulevard, Silicon Valley, CA 94025"}

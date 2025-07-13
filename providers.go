@@ -103,6 +103,34 @@ func (p *StickPromptProvider) GetPrompt(tag string, version int) (string, error)
 	return out.String(), nil
 }
 
+// GetPromptWithContext renders the template with additional context variables.
+func (p *StickPromptProvider) GetPromptWithContext(tag string, version int, keys []string, document string) (string, error) {
+	tpl, ok := p.templates[tag]
+	if !ok {
+		return "", fmt.Errorf("template %q not found", tag)
+	}
+
+	// Prepare template context with default variables plus custom ones
+	templateCtx := make(map[string]stick.Value)
+	templateCtx["version"] = version
+	templateCtx["tag"] = tag
+	templateCtx["keys"] = keys
+	templateCtx["Keys"] = keys
+	templateCtx["document"] = document
+	templateCtx["Document"] = document
+
+	// Add custom variables
+	for k, v := range p.vars {
+		templateCtx[k] = v
+	}
+
+	var out strings.Builder
+	if err := p.env.Execute(tpl, &out, templateCtx); err != nil {
+		return "", fmt.Errorf("execute %q: %w", tag, err)
+	}
+	return out.String(), nil
+}
+
 // → SimplePromptProvider stays untouched
 type SimplePromptProvider map[string]string
 

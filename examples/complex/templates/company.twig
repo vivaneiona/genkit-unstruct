@@ -13,10 +13,10 @@ Instructions:
 2. Extract full company names (including suffixes like Inc., Ltd., Corporation)
 3. Extract complete addresses including street, city, state/province, postal codes
 4. For nested company structures, extract all relevant entities
-5. Return as JSON with the exact field names: {{Keys|join(", ")}}
+5. Return as JSON with the exact field names: {% for key in keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
 Document to analyze:
-{{Document}}
+{{ document }}
 
 Example expected format:
 {"name": "MegaCorp Industries", "address": "789 Corporate Plaza, New York, NY 10001"}

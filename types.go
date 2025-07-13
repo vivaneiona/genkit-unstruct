@@ -19,6 +19,12 @@ type PromptProvider interface {
 	GetPrompt(tag string, version int) (string, error)
 }
 
+// ContextualPromptProvider extends PromptProvider to support template variables.
+type ContextualPromptProvider interface {
+	PromptProvider
+	GetPromptWithContext(tag string, version int, keys []string, document string) (string, error)
+}
+
 // Invoker abstraction allows mocking, retrying, and caching
 type Invoker interface {
 	Generate(ctx context.Context, model Model, prompt string, media []*Part) ([]byte, error)

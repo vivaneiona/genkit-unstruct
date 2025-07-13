@@ -7,6 +7,8 @@ mod? stick 'stick/.justfile'
 mod? complex 'complex/.justfile'
 mod? plan 'plan/.justfile'
 mod? vision 'vision/.justfile'
+mod? stats_demo 'stats_demo/.justfile'
+mod? test_plan_summary 'test_plan_summary/.justfile'
 
 vet:
     #!/usr/bin/env bash

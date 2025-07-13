@@ -1,10 +1,37 @@
 package unstruct
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 )
+
+// DryRunner interface for types that can perform dry-run execution
+type DryRunner interface {
+	DryRun(ctx context.Context, doc string, optFns ...func(*Options)) (*ExecutionStats, error)
+}
+
+// ExecutionStats tracks actual execution statistics for comparison with planned execution.
+type ExecutionStats struct {
+	PromptCalls       int              `json:"promptCalls"`       // Total number of prompt calls made
+	ModelCalls        map[string]int   `json:"modelCalls"`        // Number of calls per model
+	PromptGroups      int              `json:"promptGroups"`      // Number of distinct prompt groups
+	FieldsExtracted   int              `json:"fieldsExtracted"`   // Total number of fields processed
+	GroupDetails      []GroupExecution `json:"groupDetails"`      // Details of each group execution
+	TotalInputTokens  int              `json:"totalInputTokens"`  // Total input tokens (estimated)
+	TotalOutputTokens int              `json:"totalOutputTokens"` // Total output tokens (estimated)
+}
+
+// GroupExecution represents statistics for a single prompt group execution.
+type GroupExecution struct {
+	PromptName   string   `json:"promptName"`   // Name/key of the prompt
+	Model        string   `json:"model"`        // Model used for this group
+	Fields       []string `json:"fields"`       // Fields processed by this group
+	InputTokens  int      `json:"inputTokens"`  // Estimated input tokens
+	OutputTokens int      `json:"outputTokens"` // Estimated output tokens
+	ParentPath   string   `json:"parentPath"`   // Parent path for nested structures
+}
 
 // PlanNodeType defines the type of operation a node represents.
 type PlanNodeType string
@@ -30,6 +57,9 @@ type PlanNode struct {
 	ActCost      *float64               `json:"actCost,omitempty"`      // Optional actual cost (in $ or token units) if calculated
 	Children     []*PlanNode            `json:"children,omitempty"`     // Child plan nodes (sub-operations)
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`     // Additional metadata for extensibility
+	// Summary information (populated for root nodes)
+	ExpectedModels     []string       `json:"expectedModels,omitempty"`     // Models expected to be used in this plan
+	ExpectedCallCounts map[string]int `json:"expectedCallCounts,omitempty"` // Expected prompt call counts by model
 }
 
 // ModelPrice represents the pricing for a specific model.
@@ -61,6 +91,8 @@ type PlanBuilder struct {
 	schema       interface{}
 	promptConfig map[string]interface{}
 	modelConfig  map[string]string
+	unstructor   interface{} // Generic unstructor for dry-run execution
+	document     string      // Sample document for token estimation
 }
 
 // NewPlanBuilder creates a new plan builder.
@@ -89,6 +121,20 @@ func (pb *PlanBuilder) WithModelConfig(config map[string]string) *PlanBuilder {
 	return pb
 }
 
+// WithUnstructor sets an Unstructor instance for dry-run execution.
+// This enables more accurate plan generation using actual execution flow.
+func (pb *PlanBuilder) WithUnstructor(unstructor interface{}) *PlanBuilder {
+	pb.unstructor = unstructor
+	return pb
+}
+
+// WithSampleDocument sets a sample document for token estimation.
+// This is used with WithUnstructor for more accurate token counts.
+func (pb *PlanBuilder) WithSampleDocument(doc string) *PlanBuilder {
+	pb.document = doc
+	return pb
+}
+
 // Explain generates the execution plan with abstract cost estimates.
 func (pb *PlanBuilder) Explain() (*PlanNode, error) {
 	return pb.buildPlan(ExplainOptions{})
@@ -109,6 +155,123 @@ func (pb *PlanBuilder) buildPlan(options ExplainOptions) (*PlanNode, error) {
 	if pb.schema == nil {
 		return nil, fmt.Errorf("schema is required to build execution plan")
 	}
+
+	// Try dry-run execution if Unstructor is available
+	if pb.unstructor != nil && pb.document != "" {
+		return pb.buildPlanFromDryRun(options)
+	}
+
+	// Fall back to static analysis
+	return pb.buildPlanFromStaticAnalysis(options)
+}
+
+// buildPlanFromDryRun constructs the plan using actual dry-run execution.
+func (pb *PlanBuilder) buildPlanFromDryRun(options ExplainOptions) (*PlanNode, error) {
+	// This method would need type assertion for the specific Unstructor type
+	// For now, we'll implement a generic interface approach
+
+	// Try to call DryRun method via reflection or interface
+	stats, err := pb.callDryRun()
+	if err != nil {
+		// Fall back to static analysis if dry-run fails
+		return pb.buildPlanFromStaticAnalysis(options)
+	}
+
+	// Create root SchemaAnalysis node
+	rootNode := &PlanNode{
+		Type:        SchemaAnalysisType,
+		Fields:      pb.getFieldsFromStats(stats),
+		InputTokens: 10, // Schema analysis overhead
+		Children:    make([]*PlanNode, 0),
+		Metadata:    make(map[string]interface{}),
+	}
+
+	// Create PromptCall nodes from execution statistics
+	for _, groupExec := range stats.GroupDetails {
+		promptNode := &PlanNode{
+			Type:         PromptCallType,
+			PromptName:   groupExec.PromptName,
+			Model:        groupExec.Model,
+			Fields:       groupExec.Fields,
+			InputTokens:  groupExec.InputTokens,
+			OutputTokens: groupExec.OutputTokens,
+			Children:     make([]*PlanNode, 0),
+			Metadata:     make(map[string]interface{}),
+		}
+
+		// Calculate cost if pricing is available
+		if options.IncludeActualCosts && options.ModelPrices != nil {
+			actualCost := pb.calculateActualCost(promptNode, options.ModelPrices)
+			if actualCost > 0 {
+				promptNode.ActCost = &actualCost
+			}
+		}
+
+		rootNode.Children = append(rootNode.Children, promptNode)
+	}
+
+	// Create MergeFragments node
+	mergeNode := &PlanNode{
+		Type:     MergeFragmentsType,
+		Fields:   pb.getFieldsFromStats(stats),
+		Children: make([]*PlanNode, 0),
+		Metadata: make(map[string]interface{}),
+	}
+	rootNode.Children = append(rootNode.Children, mergeNode)
+
+	// Calculate costs
+	pb.calculateCosts(rootNode, options)
+
+	// Populate summary information from dry-run stats
+	rootNode.ExpectedModels = pb.getModelsFromStats(stats)
+	rootNode.ExpectedCallCounts = stats.ModelCalls
+
+	return rootNode, nil
+}
+
+// callDryRun attempts to call DryRun on the configured Unstructor
+func (pb *PlanBuilder) callDryRun() (*ExecutionStats, error) {
+	if pb.unstructor == nil || pb.document == "" {
+		return nil, fmt.Errorf("unstructor or sample document not configured")
+	}
+
+	// Check if the unstructor implements DryRunner interface
+	dryRunner, ok := pb.unstructor.(DryRunner)
+	if !ok {
+		return nil, fmt.Errorf("unstructor does not implement DryRunner interface")
+	}
+
+	// Call DryRun with a default configuration
+	return dryRunner.DryRun(context.Background(), pb.document, WithModel("gpt-3.5-turbo"))
+}
+
+// getFieldsFromStats extracts all field names from execution statistics
+func (pb *PlanBuilder) getFieldsFromStats(stats *ExecutionStats) []string {
+	fieldSet := make(map[string]bool)
+	for _, group := range stats.GroupDetails {
+		for _, field := range group.Fields {
+			fieldSet[field] = true
+		}
+	}
+
+	fields := make([]string, 0, len(fieldSet))
+	for field := range fieldSet {
+		fields = append(fields, field)
+	}
+	return fields
+}
+
+// getModelsFromStats extracts unique model names from execution statistics
+func (pb *PlanBuilder) getModelsFromStats(stats *ExecutionStats) []string {
+	models := make([]string, 0, len(stats.ModelCalls))
+	for model := range stats.ModelCalls {
+		models = append(models, model)
+	}
+	return models
+}
+
+// buildPlanFromStaticAnalysis constructs the plan using static schema analysis.
+func (pb *PlanBuilder) buildPlanFromStaticAnalysis(options ExplainOptions) (*PlanNode, error) {
 
 	// Extract fields from schema (simplified - this would be more complex in reality)
 	fields, err := pb.extractFieldsFromSchema()
@@ -145,6 +308,9 @@ func (pb *PlanBuilder) buildPlan(options ExplainOptions) (*PlanNode, error) {
 
 	// Calculate costs
 	pb.calculateCosts(rootNode, options)
+
+	// Populate summary information (expected models and call counts)
+	pb.populateSummaryInfo(rootNode)
 
 	return rootNode, nil
 }
@@ -305,6 +471,35 @@ func (pb *PlanBuilder) calculateCosts(node *PlanNode, options ExplainOptions) {
 			node.ActCost = &actualCost
 		}
 	}
+}
+
+// populateSummaryInfo collects expected models and call counts from the plan tree.
+func (pb *PlanBuilder) populateSummaryInfo(rootNode *PlanNode) {
+	models := make(map[string]bool)
+	callCounts := make(map[string]int)
+
+	var collectStats func(*PlanNode)
+	collectStats = func(node *PlanNode) {
+		if node.Type == PromptCallType && node.Model != "" {
+			models[node.Model] = true
+			callCounts[node.Model]++
+		}
+		for _, child := range node.Children {
+			collectStats(child)
+		}
+	}
+
+	collectStats(rootNode)
+
+	// Convert models map to slice
+	expectedModels := make([]string, 0, len(models))
+	for model := range models {
+		expectedModels = append(expectedModels, model)
+	}
+
+	// Only populate summary info on root node
+	rootNode.ExpectedModels = expectedModels
+	rootNode.ExpectedCallCounts = callCounts
 }
 
 // calculateNodeCost calculates the abstract cost for a single node.

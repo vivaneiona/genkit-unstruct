@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"google.golang.org/genai"
@@ -358,13 +359,29 @@ func (x *Unstructor[T]) callPrompt(
 
 	x.log.Debug("Calling prompt", "label", label, "keys", keys, "model", model)
 
-	tpl, err := x.prompts.GetPrompt(label, 1)
+	var tpl string
+	var err error
+
+	// Check if the prompt provider supports contextual prompts (like Stick templates)
+	if contextProvider, ok := x.prompts.(ContextualPromptProvider); ok {
+		tpl, err = contextProvider.GetPromptWithContext(label, 1, keys, doc)
+	} else {
+		tpl, err = x.prompts.GetPrompt(label, 1)
+	}
+
 	if err != nil {
 		x.log.Debug("Failed to get prompt template", "label", label, "error", err)
 		return nil, err
 	}
 
-	prompt := buildPrompt(tpl, keys, doc)
+	// For non-contextual providers, still use buildPrompt for {{.Keys}} replacement
+	var prompt string
+	if _, ok := x.prompts.(ContextualPromptProvider); ok {
+		// Contextual providers already have variables replaced
+		prompt = tpl
+	} else {
+		prompt = buildPrompt(tpl, keys, doc)
+	}
 
 	var result []byte
 	err = retryable(func() error {
@@ -377,4 +394,135 @@ func (x *Unstructor[T]) callPrompt(
 	}, opts.MaxRetries, opts.Backoff, x.log)
 
 	return result, err
+}
+
+// DryRun simulates the extraction process without making actual API calls.
+// Returns execution statistics that can be used for planning and cost estimation.
+func (x *Unstructor[T]) DryRun(
+	ctx context.Context,
+	doc string,
+	optFns ...func(*Options),
+) (*ExecutionStats, error) {
+	if doc == "" {
+		return nil, fmt.Errorf("dry run: %w", ErrEmptyDocument)
+	}
+
+	var opts Options
+	for _, fn := range optFns {
+		fn(&opts)
+	}
+
+	if opts.Model == "" {
+		return nil, fmt.Errorf("dry run: %w", ErrModelMissing)
+	}
+
+	// Get schema analysis
+	sch, err := schemaOf[T]()
+	if err != nil {
+		return nil, fmt.Errorf("schema analysis failed: %w", err)
+	}
+
+	// Collect statistics without making actual calls
+	stats := &ExecutionStats{
+		PromptCalls:       len(sch.group2keys),
+		ModelCalls:        make(map[string]int),
+		PromptGroups:      len(sch.group2keys),
+		FieldsExtracted:   len(sch.json2field),
+		GroupDetails:      make([]GroupExecution, 0, len(sch.group2keys)),
+		TotalInputTokens:  0,
+		TotalOutputTokens: 0,
+	}
+
+	x.log.Debug("Starting dry run analysis", "group_count", len(sch.group2keys), "field_count", len(sch.json2field))
+
+	// Simulate the execution loop
+	for pk, keys := range sch.group2keys {
+		model := opts.Model
+		// Use model from promptKey if specified, otherwise check individual fields
+		if pk.model != "" {
+			model = pk.model
+		} else if len(keys) == 1 {
+			if m := sch.json2field[keys[0]].model; m != "" {
+				model = m
+			}
+		}
+
+		// Get prompt template to estimate tokens
+		tpl, err := x.prompts.GetPrompt(pk.prompt, 1)
+		if err != nil {
+			x.log.Debug("Failed to get prompt template", "prompt", pk.prompt, "error", err)
+			// Use default template for estimation
+			tpl = fmt.Sprintf("Extract the following fields from the document: %v", keys)
+		}
+
+		// Build the full prompt for token estimation
+		fullPrompt := buildPrompt(tpl, keys, doc)
+
+		// Estimate tokens
+		inputTokens := EstimateTokensFromText(fullPrompt)
+		outputTokens := estimateOutputTokensForFields(keys)
+
+		// Update statistics
+		stats.ModelCalls[model]++
+		stats.TotalInputTokens += inputTokens
+		stats.TotalOutputTokens += outputTokens
+
+		// Add group details
+		groupExec := GroupExecution{
+			PromptName:   pk.prompt,
+			Model:        model,
+			Fields:       keys,
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			ParentPath:   pk.parentPath,
+		}
+		stats.GroupDetails = append(stats.GroupDetails, groupExec)
+
+		x.log.Debug("Simulated prompt call",
+			"prompt", pk.prompt,
+			"model", model,
+			"fields", keys,
+			"input_tokens", inputTokens,
+			"output_tokens", outputTokens)
+	}
+
+	x.log.Info("Dry run completed",
+		"prompt_calls", stats.PromptCalls,
+		"total_input_tokens", stats.TotalInputTokens,
+		"total_output_tokens", stats.TotalOutputTokens,
+		"models_used", len(stats.ModelCalls))
+
+	return stats, nil
+}
+
+// estimateOutputTokensForFields estimates output tokens based on field types and count
+func estimateOutputTokensForFields(fields []string) int {
+	// Base JSON structure overhead
+	baseTokens := 10 + len(fields)*2 // {"field": "value", ...}
+
+	// Estimate content tokens per field
+	contentTokens := 0
+	for _, field := range fields {
+		switch {
+		case containsField(field, "name") || containsField(field, "title"):
+			contentTokens += 15 // Short text
+		case containsField(field, "address") || containsField(field, "description"):
+			contentTokens += 30 // Medium text
+		case containsField(field, "email") || containsField(field, "phone") || containsField(field, "url"):
+			contentTokens += 20 // Structured text
+		case containsField(field, "age") || containsField(field, "count") || containsField(field, "number"):
+			contentTokens += 5 // Numbers
+		case containsField(field, "date") || containsField(field, "time"):
+			contentTokens += 10 // Dates/times
+		default:
+			contentTokens += 20 // Default estimate
+		}
+	}
+
+	return baseTokens + contentTokens
+}
+
+// containsField checks if a field name contains a substring (case-insensitive)
+func containsField(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

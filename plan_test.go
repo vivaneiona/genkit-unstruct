@@ -1,7 +1,11 @@
 package unstruct
 
 import (
+	"context"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPlanBuilder_Explain(t *testing.T) {
@@ -16,23 +20,14 @@ func TestPlanBuilder_Explain(t *testing.T) {
 
 	// Generate explanation
 	plan, err := builder.Explain()
-	if err != nil {
-		t.Fatalf("Failed to generate plan: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Verify root node
-	if plan.Type != SchemaAnalysisType {
-		t.Errorf("Expected root node type %s, got %s", SchemaAnalysisType, plan.Type)
-	}
-
-	if len(plan.Fields) != 4 {
-		t.Errorf("Expected 4 fields, got %d", len(plan.Fields))
-	}
+	assert.Equal(t, SchemaAnalysisType, plan.Type)
+	assert.Len(t, plan.Fields, 4)
 
 	// Should have 4 PromptCall children + 1 MergeFragments child
-	if len(plan.Children) != 5 {
-		t.Errorf("Expected 5 children, got %d", len(plan.Children))
-	}
+	assert.Len(t, plan.Children, 5)
 
 	// Verify PromptCall nodes
 	promptCallCount := 0
@@ -42,32 +37,19 @@ func TestPlanBuilder_Explain(t *testing.T) {
 		switch child.Type {
 		case PromptCallType:
 			promptCallCount++
-			if child.Model == "" {
-				t.Error("PromptCall node should have a model")
-			}
-			if child.PromptName == "" {
-				t.Error("PromptCall node should have a prompt name")
-			}
-			if len(child.Fields) != 1 {
-				t.Error("PromptCall node should have exactly one field")
-			}
+			assert.NotEmpty(t, child.Model, "PromptCall node should have a model")
+			assert.NotEmpty(t, child.PromptName, "PromptCall node should have a prompt name")
+			assert.Len(t, child.Fields, 1, "PromptCall node should have exactly one field")
 		case MergeFragmentsType:
 			mergeFragmentCount++
 		}
 	}
 
-	if promptCallCount != 4 {
-		t.Errorf("Expected 4 PromptCall nodes, got %d", promptCallCount)
-	}
-
-	if mergeFragmentCount != 1 {
-		t.Errorf("Expected 1 MergeFragments node, got %d", mergeFragmentCount)
-	}
+	assert.Equal(t, 4, promptCallCount)
+	assert.Equal(t, 1, mergeFragmentCount)
 
 	// Verify costs are calculated
-	if plan.EstCost <= 0 {
-		t.Error("Root node should have positive estimated cost")
-	}
+	assert.Greater(t, plan.EstCost, 0.0, "Root node should have positive estimated cost")
 }
 
 func TestPlanBuilder_ExplainWithCosts(t *testing.T) {
@@ -82,24 +64,18 @@ func TestPlanBuilder_ExplainWithCosts(t *testing.T) {
 	pricing := DefaultModelPricing()
 
 	plan, err := builder.ExplainWithCosts(pricing)
-	if err != nil {
-		t.Fatalf("Failed to generate plan with costs: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Verify actual costs are calculated for PromptCall nodes
 	foundActualCost := false
 	for _, child := range plan.Children {
 		if child.Type == PromptCallType && child.ActCost != nil {
 			foundActualCost = true
-			if *child.ActCost <= 0 {
-				t.Error("Actual cost should be positive")
-			}
+			assert.Greater(t, *child.ActCost, 0.0, "Actual cost should be positive")
 		}
 	}
 
-	if !foundActualCost {
-		t.Error("Should have found at least one PromptCall with actual cost")
-	}
+	assert.True(t, foundActualCost, "Should have found at least one PromptCall with actual cost")
 }
 
 func TestFormatAsText(t *testing.T) {
@@ -336,4 +312,309 @@ func containsAt(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// Tests for Execution Statistics and Dry-Run Functionality
+
+func TestExecutionStats_Structure(t *testing.T) {
+	stats := &ExecutionStats{
+		PromptCalls:       3,
+		ModelCalls:        map[string]int{"gpt-4o": 2, "gpt-3.5-turbo": 1},
+		PromptGroups:      3,
+		FieldsExtracted:   5,
+		TotalInputTokens:  1200,
+		TotalOutputTokens: 180,
+		GroupDetails: []GroupExecution{
+			{
+				PromptName:   "person-info",
+				Model:        "gpt-4o",
+				Fields:       []string{"name", "age"},
+				InputTokens:  400,
+				OutputTokens: 60,
+				ParentPath:   "",
+			},
+			{
+				PromptName:   "contact-info",
+				Model:        "gpt-3.5-turbo",
+				Fields:       []string{"email", "phone"},
+				InputTokens:  350,
+				OutputTokens: 50,
+				ParentPath:   "",
+			},
+		},
+	}
+
+	assert.Equal(t, 3, stats.PromptCalls)
+	assert.Equal(t, 3, stats.PromptGroups)
+	assert.Equal(t, 5, stats.FieldsExtracted)
+	assert.Equal(t, 1200, stats.TotalInputTokens)
+	assert.Equal(t, 180, stats.TotalOutputTokens)
+	assert.Len(t, stats.ModelCalls, 2)
+	assert.Equal(t, 2, stats.ModelCalls["gpt-4o"])
+	assert.Equal(t, 1, stats.ModelCalls["gpt-3.5-turbo"])
+	assert.Len(t, stats.GroupDetails, 2)
+}
+
+func TestGroupExecution_Structure(t *testing.T) {
+	group := GroupExecution{
+		PromptName:   "test-prompt",
+		Model:        "gpt-4o",
+		Fields:       []string{"field1", "field2"},
+		InputTokens:  100,
+		OutputTokens: 20,
+		ParentPath:   "parent.path",
+	}
+
+	assert.Equal(t, "test-prompt", group.PromptName)
+	assert.Equal(t, "gpt-4o", group.Model)
+	assert.Equal(t, []string{"field1", "field2"}, group.Fields)
+	assert.Equal(t, 100, group.InputTokens)
+	assert.Equal(t, 20, group.OutputTokens)
+	assert.Equal(t, "parent.path", group.ParentPath)
+}
+
+func TestPlanBuilder_WithUnstructor(t *testing.T) {
+	builder := NewPlanBuilder()
+
+	// Create a mock unstructor - we'll use nil for this test
+	mockUnstructor := (*MockUnstructor)(nil)
+
+	result := builder.WithUnstructor(mockUnstructor)
+
+	assert.Equal(t, builder, result) // Should return the same builder for chaining
+	assert.Equal(t, mockUnstructor, builder.unstructor)
+}
+
+func TestPlanBuilder_WithSampleDocument(t *testing.T) {
+	builder := NewPlanBuilder()
+	sampleDoc := "This is a sample document for testing token estimation."
+
+	result := builder.WithSampleDocument(sampleDoc)
+
+	assert.Equal(t, builder, result) // Should return the same builder for chaining
+	assert.Equal(t, sampleDoc, builder.document)
+}
+
+func TestPlanBuilder_CallDryRun_NoUnstructor(t *testing.T) {
+	builder := NewPlanBuilder()
+
+	stats, err := builder.callDryRun()
+
+	assert.Error(t, err)
+	assert.Nil(t, stats)
+	assert.Contains(t, err.Error(), "unstructor or sample document not configured")
+}
+
+func TestPlanBuilder_CallDryRun_NoDocument(t *testing.T) {
+	builder := NewPlanBuilder()
+	builder.WithUnstructor(&MockUnstructor{})
+
+	stats, err := builder.callDryRun()
+
+	assert.Error(t, err)
+	assert.Nil(t, stats)
+	assert.Contains(t, err.Error(), "unstructor or sample document not configured")
+}
+
+func TestPlanBuilder_CallDryRun_NotDryRunner(t *testing.T) {
+	builder := NewPlanBuilder()
+	builder.WithUnstructor("not a dry runner") // String doesn't implement DryRunner
+	builder.WithSampleDocument("sample doc")
+
+	stats, err := builder.callDryRun()
+
+	assert.Error(t, err)
+	assert.Nil(t, stats)
+	assert.Contains(t, err.Error(), "does not implement DryRunner interface")
+}
+
+func TestPlanBuilder_GetFieldsFromStats(t *testing.T) {
+	builder := NewPlanBuilder()
+	stats := &ExecutionStats{
+		GroupDetails: []GroupExecution{
+			{Fields: []string{"name", "age"}},
+			{Fields: []string{"email", "phone"}},
+			{Fields: []string{"name", "address"}}, // name appears twice
+		},
+	}
+
+	fields := builder.getFieldsFromStats(stats)
+
+	assert.Len(t, fields, 5) // Should have 5 unique fields
+	assert.Contains(t, fields, "name")
+	assert.Contains(t, fields, "age")
+	assert.Contains(t, fields, "email")
+	assert.Contains(t, fields, "phone")
+	assert.Contains(t, fields, "address")
+}
+
+func TestPlanBuilder_GetModelsFromStats(t *testing.T) {
+	builder := NewPlanBuilder()
+	stats := &ExecutionStats{
+		ModelCalls: map[string]int{
+			"gpt-4o":        2,
+			"gpt-3.5-turbo": 1,
+			"claude-3":      1,
+		},
+	}
+
+	models := builder.getModelsFromStats(stats)
+
+	assert.Len(t, models, 3)
+	assert.Contains(t, models, "gpt-4o")
+	assert.Contains(t, models, "gpt-3.5-turbo")
+	assert.Contains(t, models, "claude-3")
+}
+
+func TestPlanBuilder_BuildPlanFromStaticAnalysis_Fallback(t *testing.T) {
+	builder := NewPlanBuilder()
+	schema := map[string]interface{}{
+		"fields": []string{"name", "age"},
+	}
+	builder.WithSchema(schema)
+
+	plan, err := builder.buildPlanFromStaticAnalysis(ExplainOptions{})
+
+	require.NoError(t, err)
+	assert.NotNil(t, plan)
+	assert.Equal(t, SchemaAnalysisType, plan.Type)
+	assert.Len(t, plan.Fields, 2)
+	assert.Contains(t, plan.Fields, "name")
+	assert.Contains(t, plan.Fields, "age")
+}
+
+func TestDryRunner_Interface(t *testing.T) {
+	// Test that our MockUnstructor implements DryRunner
+	var mock DryRunner = &MockUnstructor{}
+	assert.NotNil(t, mock)
+
+	// Test the interface method signature
+	stats, err := mock.DryRun(context.Background(), "test doc")
+	assert.NotNil(t, stats) // MockUnstructor should return stats
+	assert.NoError(t, err)
+}
+
+func TestPlanNode_ExpectedModelsAndCounts(t *testing.T) {
+	builder := NewPlanBuilder()
+	schema := map[string]interface{}{
+		"fields": []string{"name", "email"},
+	}
+	modelConfig := map[string]string{
+		"name":  "gpt-4o",
+		"email": "gpt-3.5-turbo",
+	}
+
+	builder.WithSchema(schema).WithModelConfig(modelConfig)
+
+	plan, err := builder.Explain()
+
+	require.NoError(t, err)
+	assert.NotNil(t, plan.ExpectedModels)
+	assert.NotNil(t, plan.ExpectedCallCounts)
+
+	// Should have both models
+	assert.Len(t, plan.ExpectedModels, 2)
+	assert.Contains(t, plan.ExpectedModels, "gpt-4o")
+	assert.Contains(t, plan.ExpectedModels, "gpt-3.5-turbo")
+
+	// Should have correct call counts
+	assert.Equal(t, 1, plan.ExpectedCallCounts["gpt-4o"])
+	assert.Equal(t, 1, plan.ExpectedCallCounts["gpt-3.5-turbo"])
+}
+
+func TestEstimateOutputTokensForFields(t *testing.T) {
+	tests := []struct {
+		name           string
+		fields         []string
+		expectedMinMax [2]int // min, max expected tokens
+	}{
+		{
+			name:           "name fields",
+			fields:         []string{"name", "title"},
+			expectedMinMax: [2]int{25, 50}, // Base + 2 short fields
+		},
+		{
+			name:           "address fields",
+			fields:         []string{"address", "description"},
+			expectedMinMax: [2]int{64, 80}, // Base + 2 medium fields
+		},
+		{
+			name:           "contact fields",
+			fields:         []string{"email", "phone"},
+			expectedMinMax: [2]int{44, 60}, // Base + 2 structured fields
+		},
+		{
+			name:           "numeric fields",
+			fields:         []string{"age", "count"},
+			expectedMinMax: [2]int{14, 25}, // Base + 2 number fields
+		},
+		{
+			name:           "mixed fields",
+			fields:         []string{"name", "address", "age"},
+			expectedMinMax: [2]int{54, 80}, // Base + mixed field types
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokens := estimateOutputTokensForFields(tt.fields)
+			assert.GreaterOrEqual(t, tokens, tt.expectedMinMax[0], "tokens should be at least minimum expected")
+			assert.LessOrEqual(t, tokens, tt.expectedMinMax[1], "tokens should not exceed maximum expected")
+		})
+	}
+}
+
+func TestContainsField(t *testing.T) {
+	tests := []struct {
+		field    string
+		substr   string
+		expected bool
+	}{
+		{"name", "name", true},
+		{"full_name", "name", true},
+		{"customer_name", "name", true},
+		{"NAME", "name", true}, // case insensitive
+		{"age", "name", false},
+		{"address", "addr", true},
+		{"email_address", "email", true},
+		{"phone_number", "phone", true},
+		{"description", "desc", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.field+"_contains_"+tt.substr, func(t *testing.T) {
+			result := containsField(tt.field, tt.substr)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// MockUnstructor for testing DryRunner interface
+type MockUnstructor struct{}
+
+func (m *MockUnstructor) DryRun(ctx context.Context, doc string, optFns ...func(*Options)) (*ExecutionStats, error) {
+	return &ExecutionStats{
+		PromptCalls:       2,
+		ModelCalls:        map[string]int{"gpt-4o": 1, "gpt-3.5-turbo": 1},
+		PromptGroups:      2,
+		FieldsExtracted:   4,
+		TotalInputTokens:  100,
+		TotalOutputTokens: 50,
+		GroupDetails: []GroupExecution{
+			{
+				PromptName:   "test-prompt-1",
+				Model:        "gpt-4o",
+				Fields:       []string{"field1", "field2"},
+				InputTokens:  50,
+				OutputTokens: 25,
+			},
+			{
+				PromptName:   "test-prompt-2",
+				Model:        "gpt-3.5-turbo",
+				Fields:       []string{"field3", "field4"},
+				InputTokens:  50,
+				OutputTokens: 25,
+			},
+		},
+	}, nil
 }

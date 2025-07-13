@@ -160,6 +160,37 @@ func main() {
 	fmt.Println("\n=== Demo Complete ===")
 }
 
+// Example 8: Demonstrate Dry-Run Execution Statistics (if we had an actual Unstructor)
+func demonstrateDryRunStats() {
+	fmt.Println("\n8. Dry-Run Execution Statistics Demo")
+	fmt.Println("Note: This would work with an actual Unstructor instance:")
+
+	// Example of what dry-run statistics would look like
+	fmt.Println(`
+	Sample Dry-Run Output:
+	----------------------
+	Prompt Calls: 6
+	Prompt Groups: 4 
+	Fields Extracted: 6
+	Total Input Tokens: 2200
+	Total Output Tokens: 180
+	Model Calls: {gpt-3.5-turbo: 4, gpt-4: 2}
+	
+	Group Details:
+	  1. prompt-group-1 (gpt-3.5-turbo): [Name, Email, Phone] -> 1200 tokens in, 60 tokens out
+	  2. prompt-group-2 (gpt-4): [Experience] -> 500 tokens in, 60 tokens out  
+	  3. prompt-group-3 (gpt-4): [Education] -> 450 tokens in, 50 tokens out
+	  4. prompt-group-4 (gpt-3.5-turbo): [Skills] -> 50 tokens in, 10 tokens out
+	
+	Expected vs Actual Comparison:
+	✓ All prompt calls matched expected count
+	✓ Model distribution as planned
+	✓ Token estimates within acceptable range
+	`)
+
+	fmt.Println("\n=== Demo Complete ===")
+}
+
 // Utility function to repeat a string (since Go doesn't have built-in string repetition)
 func repeat(s string, count int) string {
 	result := ""

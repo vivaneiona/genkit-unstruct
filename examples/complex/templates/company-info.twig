@@ -18,10 +18,10 @@ Instructions:
 3. Extract full addresses including complete geographical information
 4. For complex corporate structures, identify relationships and hierarchies
 5. Use advanced reasoning to distinguish between different corporate entities
-6. Return as JSON with the exact field names: {{Keys|join(", ")}}
+6. Return as JSON with the exact field names: {% for key in keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
 Document to analyze:
-{{Document}}
+{{ document }}
 
 Example expected format:
 {"name": "International Science Foundation", "address": "555 Research Park, Geneva, Switzerland 1201"}
