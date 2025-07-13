@@ -46,6 +46,7 @@ type Options struct {
 	CustomParser     func([]byte) (any, error) // override JSON→struct
 	FallbackPrompt   string                    // used when tag.prompt == ""
 	FieldModels      FieldModelMap             // per-field model overrides
+	FlattenGroups    bool                      // if true, ignore parent paths when grouping by prompt+model
 }
 
 // Functional option constructors
@@ -95,4 +96,11 @@ func WithModelFor(model string, typ any, fieldName string) func(*Options) {
 		key := typeName + "." + fieldName
 		o.FieldModels[key] = model
 	}
+}
+
+// WithFlattenGroups enables flattening of groups with the same prompt and model
+// When enabled, fields with the same prompt and model will be grouped together
+// regardless of their parent path, resulting in fewer API calls
+func WithFlattenGroups() func(*Options) {
+	return func(o *Options) { o.FlattenGroups = true }
 }

@@ -86,7 +86,13 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 				continue
 			}
 
-			pk := promptKey{prompt: tp.prompt, parentPath: parent, model: model}
+			// Create prompt key, optionally flattening groups
+			parentPathForGrouping := parent
+			if opts != nil && opts.FlattenGroups {
+				parentPathForGrouping = ""
+			}
+			
+			pk := promptKey{prompt: tp.prompt, parentPath: parentPathForGrouping, model: model}
 			s.group2keys[pk] = append(s.group2keys[pk], fullKey)
 			s.json2field[fullKey] = fieldSpec{
 				jsonKey: fullKey, model: model, index: nextIdx,
