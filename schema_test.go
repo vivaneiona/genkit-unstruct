@@ -36,7 +36,7 @@ type ModelOverrideStruct struct {
 	BasicField string `json:"basic" unstruct:"basic"`
 	FlashField string `json:"flash" unstruct:"fast,gemini-1.5-flash"`
 	ProField   string `json:"pro" unstruct:"complex,gemini-1.5-pro"`
-	ModelOnly  string `json:"model_only" unstruct:"gemini-1.5-flash-8b"`
+	ModelOnly  string `json:"model_only" unstruct:"model/gemini-1.5-flash-8b"`
 }
 
 type InheritanceStruct struct {
@@ -55,6 +55,46 @@ type EdgeCaseStruct struct {
 	TimeField  time.Time              `json:"time_field" unstruct:"temporal"`
 	unexported string                 `json:"unexported" unstruct:"basic"`
 	Anonymous  struct{ Field string } // Anonymous struct
+}
+
+// Test structures for model prefix testing
+type ProviderPrefixStruct struct {
+	GoogleAIField string `json:"googleai_field" unstruct:"provider_test,googleai/gemini-1.5-pro"`
+	PlainField    string `json:"plain_field" unstruct:"plain_test,gemini-1.5-pro"`
+	UnknownField  string `json:"unknown_field" unstruct:"unknown_test,custom-model-name"`
+	FlashField    string `json:"flash_field" unstruct:"flash_test,gemini-1.5-flash"`
+}
+
+// Test structures for tag parsing behavior with new syntax
+type TagParsingStruct struct {
+	RegularPromptField string `json:"regular_prompt" unstruct:"my_prompt"`
+	ModelOnlyField     string `json:"model_only" unstruct:"model/googleai/gemini-1.5-pro"`
+	ExplicitField      string `json:"explicit" unstruct:"custom_prompt,googleai/gemini-1.5-pro"`
+	EmptyTagField      string `json:"empty_tag" unstruct:""`
+}
+
+// Test structures for new syntax formats
+type NewSyntaxStruct struct {
+	// Traditional explicit format: prompt,model
+	ExplicitField string `json:"explicit" unstruct:"my_prompt,my_model"`
+
+	// New model/ prefix format: inherits prompt, specifies model
+	ModelOnlyField string `json:"model_only" unstruct:"model/googleai/gemini-1.5-pro"`
+
+	// New prompt/ prefix format: specifies prompt, no model
+	PromptOnlyField string `json:"prompt_only" unstruct:"prompt/custom_extraction"`
+
+	// Regular prompt (existing behavior)
+	PromptField string `json:"prompt_field" unstruct:"regular_prompt"`
+
+	// Provider-prefixed models with explicit prompt
+	ProviderField string `json:"provider_field" unstruct:"extraction,vertex/gemini-1.5-flash"`
+
+	// Complex model names
+	ComplexModelField string `json:"complex_model" unstruct:"model/anthropic/claude-3-sonnet"`
+
+	// Empty tag (inherit)
+	InheritField string `json:"inherit_field" unstruct:""`
 }
 
 func TestSchemaOf_SimpleStruct(t *testing.T) {
@@ -349,6 +389,266 @@ func TestSchemaGrouping(t *testing.T) {
 	}
 }
 
+func TestSchemaOf_ProviderPrefixModels(t *testing.T) {
+	sch, err := schemaOf[ProviderPrefixStruct]()
+	if err != nil {
+		t.Fatalf("schemaOf failed: %v", err)
+	}
+
+	// Check that googleai/ prefixed model is preserved as-is
+	googleAIField := sch.json2field["googleai_field"]
+	if googleAIField.model != "googleai/gemini-1.5-pro" {
+		t.Errorf("Expected model 'googleai/gemini-1.5-pro', got %s", googleAIField.model)
+	}
+
+	// Check that plain model name is preserved
+	plainField := sch.json2field["plain_field"]
+	if plainField.model != "gemini-1.5-pro" {
+		t.Errorf("Expected model 'gemini-1.5-pro', got %s", plainField.model)
+	}
+
+	// Check that unknown/custom model name is preserved
+	unknownField := sch.json2field["unknown_field"]
+	if unknownField.model != "custom-model-name" {
+		t.Errorf("Expected model 'custom-model-name', got %s", unknownField.model)
+	}
+
+	// Check that flash model is preserved
+	flashField := sch.json2field["flash_field"]
+	if flashField.model != "gemini-1.5-flash" {
+		t.Errorf("Expected model 'gemini-1.5-flash', got %s", flashField.model)
+	}
+
+	// Check prompt grouping with different models
+	expectedGroups := []promptKey{
+		{prompt: "provider_test", parentPath: "", model: "googleai/gemini-1.5-pro"},
+		{prompt: "plain_test", parentPath: "", model: "gemini-1.5-pro"},
+		{prompt: "unknown_test", parentPath: "", model: "custom-model-name"},
+		{prompt: "flash_test", parentPath: "", model: "gemini-1.5-flash"},
+	}
+
+	for _, expectedKey := range expectedGroups {
+		if _, exists := sch.group2keys[expectedKey]; !exists {
+			t.Errorf("Expected prompt group %+v to exist", expectedKey)
+		}
+	}
+}
+
+func TestNewSyntaxFormats(t *testing.T) {
+	sch, err := schemaOf[NewSyntaxStruct]()
+	if err != nil {
+		t.Fatalf("schemaOf failed: %v", err)
+	}
+
+	testCases := []struct {
+		field           string
+		expectedPrompt  string
+		expectedModel   string
+		description     string
+	}{
+		{
+			field:          "explicit",
+			expectedPrompt: "my_prompt",
+			expectedModel:  "my_model",
+			description:    "explicit prompt,model format should work",
+		},
+		{
+			field:          "model_only",
+			expectedPrompt: "",
+			expectedModel:  "googleai/gemini-1.5-pro",
+			description:    "model/ prefix should set model and inherit prompt",
+		},
+		{
+			field:          "prompt_only",
+			expectedPrompt: "custom_extraction",
+			expectedModel:  "",
+			description:    "prompt/ prefix should set prompt with no model",
+		},
+		{
+			field:          "prompt_field",
+			expectedPrompt: "regular_prompt",
+			expectedModel:  "",
+			description:    "regular prompt should work as before",
+		},
+		{
+			field:          "provider_field",
+			expectedPrompt: "extraction",
+			expectedModel:  "vertex/gemini-1.5-flash",
+			description:    "provider-prefixed models with explicit prompt should work",
+		},
+		{
+			field:          "complex_model",
+			expectedPrompt: "",
+			expectedModel:  "anthropic/claude-3-sonnet",
+			description:    "complex model names with model/ prefix should work",
+		},
+		{
+			field:          "inherit_field",
+			expectedPrompt: "",
+			expectedModel:  "",
+			description:    "empty tag should inherit from parent (empty in this case)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			fieldSpec, exists := sch.json2field[tc.field]
+			if !exists {
+				t.Fatalf("Field %s should exist in schema", tc.field)
+			}
+
+			if fieldSpec.model != tc.expectedModel {
+				t.Errorf("Field %s: Expected model '%s', got '%s'", tc.field, tc.expectedModel, fieldSpec.model)
+			}
+
+			// Check that the field is in the correct prompt group
+			found := false
+			for pk, fields := range sch.group2keys {
+				if pk.prompt == tc.expectedPrompt && pk.model == tc.expectedModel {
+					for _, field := range fields {
+						if field == tc.field {
+							found = true
+							break
+						}
+					}
+					if found {
+						break
+					}
+				}
+			}
+			if !found {
+				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')", 
+					tc.field, tc.expectedPrompt, tc.expectedModel)
+			}
+		})
+	}
+}
+
+func TestTagParsing_NewFormats(t *testing.T) {
+	// Test direct tag parsing with the new parseUnstructTag function
+	testCases := []struct {
+		tag            string
+		inheritedPrompt string
+		expectedPrompt string
+		expectedModel  string
+		description    string
+	}{
+		{
+			tag:            "model/openai/gpt-4",
+			inheritedPrompt: "inherited",
+			expectedPrompt: "inherited",
+			expectedModel:  "openai/gpt-4",
+			description:    "model/ prefix should inherit prompt and set model",
+		},
+		{
+			tag:            "prompt/my_extraction",
+			inheritedPrompt: "",
+			expectedPrompt: "my_extraction",
+			expectedModel:  "",
+			description:    "prompt/ prefix should set prompt and no model",
+		},
+		{
+			tag:            "custom_prompt,custom_model",
+			inheritedPrompt: "",
+			expectedPrompt: "custom_prompt",
+			expectedModel:  "custom_model",
+			description:    "explicit format should work",
+		},
+		{
+			tag:            "just_prompt",
+			inheritedPrompt: "",
+			expectedPrompt: "just_prompt",
+			expectedModel:  "",
+			description:    "single value should be treated as prompt",
+		},
+		{
+			tag:            "",
+			inheritedPrompt: "parent_prompt",
+			expectedPrompt: "parent_prompt",
+			expectedModel:  "",
+			description:    "empty tag should inherit prompt",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result := parseUnstructTag(tc.tag, tc.inheritedPrompt)
+			if result.prompt != tc.expectedPrompt {
+				t.Errorf("Tag %q: Expected prompt '%s', got '%s'", tc.tag, tc.expectedPrompt, result.prompt)
+			}
+			if result.model != tc.expectedModel {
+				t.Errorf("Tag %q: Expected model '%s', got '%s'", tc.tag, tc.expectedModel, result.model)
+			}
+		})
+	}
+}
+
+// Test that demonstrates the fix for provider-prefixed model issue
+type ProviderPrefixIssueStruct struct {
+	GoogleAIModel   string `json:"googleai_model" unstruct:"model/googleai/gemini-1.5-pro"`
+	VertexModel     string `json:"vertex_model" unstruct:"model/vertex/gemini-1.5-flash"`
+	BarePlainModel  string `json:"bare_model" unstruct:"model/gemini-1.5-pro"`
+	UnknownProvider string `json:"unknown_provider" unstruct:"openai/gpt-4"` // This stays as prompt
+}
+
+func TestProviderPrefixModelRecognition(t *testing.T) {
+	sch, err := schemaOf[ProviderPrefixIssueStruct]()
+	if err != nil {
+		t.Fatalf("schemaOf failed: %v", err)
+	}
+
+	testCases := []struct {
+		field         string
+		expectedModel string
+		shouldBeModel bool
+		description   string
+	}{
+		{
+			field:         "googleai_model",
+			expectedModel: "googleai/gemini-1.5-pro",
+			shouldBeModel: true,
+			description:   "googleai/ prefix should be recognized as model",
+		},
+		{
+			field:         "vertex_model",
+			expectedModel: "vertex/gemini-1.5-flash",
+			shouldBeModel: true,
+			description:   "vertex/ prefix should be recognized as model",
+		},
+		{
+			field:         "bare_model",
+			expectedModel: "gemini-1.5-pro",
+			shouldBeModel: true,
+			description:   "bare model name should work as before",
+		},
+		{
+			field:         "unknown_provider",
+			expectedModel: "",
+			shouldBeModel: false,
+			description:   "unknown provider should not be treated as model",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			fieldSpec, exists := sch.json2field[tc.field]
+			if !exists {
+				t.Fatalf("Field %s should exist in schema", tc.field)
+			}
+
+			if tc.shouldBeModel {
+				if fieldSpec.model != tc.expectedModel {
+					t.Errorf("Expected model '%s', got '%s'", tc.expectedModel, fieldSpec.model)
+				}
+			} else {
+				if fieldSpec.model != "" {
+					t.Errorf("Expected empty model (treated as prompt), got '%s'", fieldSpec.model)
+				}
+			}
+		})
+	}
+}
+
 // BenchmarkSchemaOf tests performance of schema generation
 func BenchmarkSchemaOf(b *testing.B) {
 	b.Run("Simple", func(b *testing.B) {
@@ -372,6 +672,15 @@ func BenchmarkSchemaOf(b *testing.B) {
 	b.Run("Complex", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_, err := schemaOf[ModelOverrideStruct]()
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("ProviderPrefix", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := schemaOf[ProviderPrefixStruct]()
 			if err != nil {
 				b.Fatal(err)
 			}

@@ -109,7 +109,7 @@ func TestTagParsing(t *testing.T) {
 	}{
 		{"", "default", "default", ""},
 		{"project", "", "project", ""},
-		{"gemini-1.5-pro", "default", "default", "gemini-1.5-pro"},
+		{"model/gemini-1.5-pro", "default", "default", "gemini-1.5-pro"},
 		{"prompt-name,gemini-1.5-pro", "", "prompt-name", "gemini-1.5-pro"},
 		{"cert,gemini-1.5-flash", "base", "cert", "gemini-1.5-flash"},
 		{"malformed,too,many,parts", "fallback", "fallback", ""},
@@ -128,28 +128,6 @@ func TestTagParsing(t *testing.T) {
 	}
 }
 
-func TestKnownModel(t *testing.T) {
-	knownModels := []string{
-		"gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-flash-8b",
-		"gemini-1.0-pro", "gemini-pro", "gemini-flash",
-	}
-
-	unknownModels := []string{
-		"gpt-4", "claude-3", "llama-2", "custom-model", "",
-	}
-
-	for _, model := range knownModels {
-		if !knownModel(model) {
-			t.Errorf("Expected %q to be recognized as known model", model)
-		}
-	}
-
-	for _, model := range unknownModels {
-		if knownModel(model) {
-			t.Errorf("Expected %q to be recognized as unknown model", model)
-		}
-	}
-}
 
 func TestSingleCallWithParentStructModel(t *testing.T) {
 	// Test that when model is defined at parent struct level,
