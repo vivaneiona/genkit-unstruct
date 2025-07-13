@@ -58,7 +58,8 @@ func main() {
 
 	// 1. Test Dry-Run Statistics Collection
 	fmt.Println("\n1. Testing Dry-Run Statistics Collection")
-	stats, err := unstructor.DryRun(context.Background(), sampleDoc, unstruct.WithModel("gpt-3.5-turbo"))
+	assets := []unstruct.Asset{unstruct.NewTextAsset(sampleDoc)}
+	stats, err := unstructor.DryRun(context.Background(), assets, unstruct.WithModel("gpt-3.5-turbo"))
 	if err != nil {
 		fmt.Printf("Dry-run failed: %v\n", err)
 		return

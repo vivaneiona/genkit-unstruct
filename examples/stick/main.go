@@ -120,9 +120,10 @@ func main() {
 
 		slog.Debug("Starting extraction", "document", doc.name, "model", "gemini-1.5-flash")
 
+		assets := []unstruct.Asset{unstruct.NewTextAsset(doc.text)}
 		out, err := uno.Unstruct(
 			context.Background(),
-			doc.text,
+			assets,
 			unstruct.WithModel("gemini-1.5-flash"),
 			unstruct.WithTimeout(30*time.Second),
 			unstruct.WithRetry(2, 1*time.Second),

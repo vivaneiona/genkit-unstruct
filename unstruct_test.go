@@ -80,12 +80,13 @@ func TestUnstructor_CallPrompt(t *testing.T) {
 
 	keys := []string{"name", "code"}
 	doc := "Project Alpha with code ABC-123"
+	assets := []Asset{&TextAsset{Content: doc}}
 
 	raw, err := ext.callPrompt(
 		context.Background(),
 		"basic",
 		keys,
-		doc,
+		assets,
 		"test-model",
 		Options{},
 	)
@@ -103,10 +104,11 @@ func TestUnstructor_UnstructAll(t *testing.T) {
 	ext := NewForTesting[TestProject](mockPrompts{})
 
 	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
+	assets := []Asset{&TextAsset{Content: doc}}
 
 	result, err := ext.Unstruct(
 		context.Background(),
-		doc,
+		assets,
 		WithModel("test-model"),
 		WithTimeout(10*time.Second),
 	)
@@ -164,11 +166,12 @@ func TestUnstructor_RequiredPrompts(t *testing.T) {
 	ext := NewForTesting[ProjectWithMissingPrompts](mockPrompts{})
 
 	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
+	assets := []Asset{&TextAsset{Content: doc}}
 
 	// Should error because fields are missing prompts and no fallback is provided
 	result, err := ext.Unstruct(
 		context.Background(),
-		doc,
+		assets,
 		WithModel("test-model"),
 		WithTimeout(10*time.Second),
 	)
@@ -192,11 +195,12 @@ func TestUnstructor_WithFallbackPrompt(t *testing.T) {
 	ext := NewForTesting[ProjectWithMissingPrompts](mockPrompts{})
 
 	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
+	assets := []Asset{&TextAsset{Content: doc}}
 
 	// Should succeed when fallback prompt is provided
 	result, err := ext.Unstruct(
 		context.Background(),
-		doc,
+		assets,
 		WithModel("test-model"),
 		WithTimeout(10*time.Second),
 		WithFallbackPrompt("basic"), // Explicit fallback

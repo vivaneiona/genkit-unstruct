@@ -15,20 +15,9 @@ import (
 
 // ErrEmptyDocument is returned when the source document is an empty string.
 var ErrEmptyDocument = errors.New("document text is empty")
+var ErrEmptyAssets = errors.New("no assets provided")
 var ErrModelMissing = errors.New("model not specified")
 var ErrMissingSchema = errors.New("schema is required")
-
-// Part represents a part of a message (text, image, etc.)
-type Part struct {
-	Type string
-	Text string
-	Data []byte
-}
-
-// NewTextPart creates a new text part
-func NewTextPart(text string) *Part {
-	return &Part{Type: "text", Text: text}
-}
 
 // Message represents a message in a conversation
 type Message struct {
@@ -65,23 +54,43 @@ func GenerateBytes(ctx context.Context, client *genai.Client, log *slog.Logger, 
 		modelName = "gemini-1.5-pro"
 	}
 
-	// Build the prompt from messages
-	var prompt string
-	if len(cfg.Messages) > 0 && len(cfg.Messages[0].Parts) > 0 {
-		prompt = cfg.Messages[0].Parts[0].Text
+	// Build content from messages
+	var contents []*genai.Content
+
+	for _, msg := range cfg.Messages {
+		// For now, concatenate all text parts into a single prompt
+		var textParts []string
+		var hasMedia bool
+
+		for _, part := range msg.Parts {
+			switch part.Type {
+			case "text":
+				textParts = append(textParts, part.Text)
+			case "image":
+				hasMedia = true
+				// TODO: Implement proper image handling with the genai API
+			}
+		}
+
+		if len(textParts) > 0 {
+			combinedText := strings.Join(textParts, "\n")
+			content := genai.NewContentFromText(combinedText, genai.RoleUser)
+			contents = append(contents, content)
+		}
+
+		// Log if we have media that's not being processed
+		if hasMedia {
+			log.Debug("Media parts detected but not fully implemented in genai integration")
+		}
 	}
 
-	if prompt == "" {
-		log.Debug("No prompt provided")
-		return nil, fmt.Errorf("no prompt provided")
+	// Fallback to text-only if no messages provided
+	if len(contents) == 0 {
+		log.Debug("No valid content from messages")
+		return nil, fmt.Errorf("no valid content provided")
 	}
 
-	log.Debug("Generating content", "model", modelName, "prompt_length", len(prompt))
-
-	// Create content for the request
-	contents := []*genai.Content{
-		genai.NewContentFromText(prompt, genai.RoleUser),
-	}
+	log.Debug("Generating content", "model", modelName, "content_count", len(contents))
 
 	// Create generation config for JSON output
 	config := &genai.GenerateContentConfig{
@@ -134,11 +143,11 @@ func NewWithLogger[T any](client *genai.Client, p PromptProvider, log *slog.Logg
 // Unstruct runs the multi-prompt flow and returns a fully-populated value.
 func (x *Unstructor[T]) Unstruct(
 	ctx context.Context,
-	doc string,
+	assets []Asset,
 	optFns ...func(*Options),
 ) (*T, error) {
-	if doc == "" {
-		return nil, fmt.Errorf("extract: %w", ErrEmptyDocument)
+	if len(assets) == 0 {
+		return nil, fmt.Errorf("extract: %w", ErrEmptyAssets)
 	}
 
 	var opts Options
@@ -172,8 +181,8 @@ func (x *Unstructor[T]) Unstruct(
 		egCtx = d.ctx
 	}
 
-	// 1. Get new schema with grouping logic
-	sch, err := schemaOf[T]()
+	// 1. Get new schema with grouping logic and field model overrides
+	sch, err := schemaOfWithOptions[T](&opts)
 	if err != nil {
 		return nil, fmt.Errorf("schema analysis failed: %w", err)
 	}
@@ -203,7 +212,7 @@ func (x *Unstructor[T]) Unstruct(
 					model = m
 				}
 			}
-			raw, err := x.callPrompt(egCtx, pk.prompt, keys, doc, model, opts)
+			raw, err := x.callPrompt(egCtx, pk.prompt, keys, assets, model, opts)
 			if err != nil {
 				return fmt.Errorf("%s: %w", pk.prompt, err)
 			}
@@ -273,7 +282,10 @@ func (d *DynamicUnstructor) ExtractDynamic(
 	// Add schema to options
 	optFns = append(optFns, WithOutputSchema(schema))
 
-	result, err := d.Unstructor.Unstruct(ctx, doc, optFns...)
+	// Convert string document to TextAsset
+	assets := []Asset{&TextAsset{Content: doc}}
+
+	result, err := d.Unstructor.Unstruct(ctx, assets, optFns...)
 	if err != nil {
 		return nil, err
 	}
@@ -299,10 +311,13 @@ func (x *Unstructor[T]) Stream(
 	// Enable streaming in options
 	optFns = append(optFns, WithStreaming())
 
+	// Convert string document to TextAsset
+	assets := []Asset{&TextAsset{Content: doc}}
+
 	// For now, streaming is a simplified implementation
 	// In a full implementation, this would use the streaming API
 	// and call onUpdate with partial results as they arrive
-	result, err := x.Unstruct(ctx, doc, optFns...)
+	result, err := x.Unstruct(ctx, assets, optFns...)
 	if err != nil {
 		return err
 	}
@@ -344,7 +359,7 @@ func (x *Unstructor[T]) callPrompt(
 	ctx context.Context,
 	promptLabel string,
 	keys []string,
-	doc string,
+	assets []Asset,
 	model string,
 	opts Options,
 ) ([]byte, error) {
@@ -359,12 +374,33 @@ func (x *Unstructor[T]) callPrompt(
 
 	x.log.Debug("Calling prompt", "label", label, "keys", keys, "model", model)
 
+	// Extract text content and media from assets for prompt building
+	var textContent string
+	var allMessages []*Message
+
+	for _, asset := range assets {
+		messages, err := asset.CreateMessages(ctx, x.log)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create messages from asset: %w", err)
+		}
+		allMessages = append(allMessages, messages...)
+
+		// Extract text content for template building (use first text part found)
+		for _, msg := range messages {
+			for _, part := range msg.Parts {
+				if part.Type == "text" && textContent == "" {
+					textContent = part.Text
+				}
+			}
+		}
+	}
+
 	var tpl string
 	var err error
 
 	// Check if the prompt provider supports contextual prompts (like Stick templates)
 	if contextProvider, ok := x.prompts.(ContextualPromptProvider); ok {
-		tpl, err = contextProvider.GetPromptWithContext(label, 1, keys, doc)
+		tpl, err = contextProvider.GetPromptWithContext(label, 1, keys, textContent)
 	} else {
 		tpl, err = x.prompts.GetPrompt(label, 1)
 	}
@@ -380,13 +416,23 @@ func (x *Unstructor[T]) callPrompt(
 		// Contextual providers already have variables replaced
 		prompt = tpl
 	} else {
-		prompt = buildPrompt(tpl, keys, doc)
+		prompt = buildPrompt(tpl, keys, textContent)
+	}
+
+	// Collect all media parts from all messages
+	var mediaParts []*Part
+	for _, msg := range allMessages {
+		for _, part := range msg.Parts {
+			if part.Type != "text" {
+				mediaParts = append(mediaParts, part)
+			}
+		}
 	}
 
 	var result []byte
 	err = retryable(func() error {
 		var genErr error
-		result, genErr = x.invoker.Generate(ctx, Model(model), prompt, opts.media)
+		result, genErr = x.invoker.Generate(ctx, Model(model), prompt, mediaParts)
 		if genErr != nil {
 			x.log.Debug("Generate failed", "label", label, "model", model, "error", genErr)
 		}
@@ -400,11 +446,11 @@ func (x *Unstructor[T]) callPrompt(
 // Returns execution statistics that can be used for planning and cost estimation.
 func (x *Unstructor[T]) DryRun(
 	ctx context.Context,
-	doc string,
+	assets []Asset,
 	optFns ...func(*Options),
 ) (*ExecutionStats, error) {
-	if doc == "" {
-		return nil, fmt.Errorf("dry run: %w", ErrEmptyDocument)
+	if len(assets) == 0 {
+		return nil, fmt.Errorf("dry run: %w", ErrEmptyAssets)
 	}
 
 	var opts Options
@@ -416,8 +462,8 @@ func (x *Unstructor[T]) DryRun(
 		return nil, fmt.Errorf("dry run: %w", ErrModelMissing)
 	}
 
-	// Get schema analysis
-	sch, err := schemaOf[T]()
+	// Get schema analysis with field model overrides
+	sch, err := schemaOfWithOptions[T](&opts)
 	if err != nil {
 		return nil, fmt.Errorf("schema analysis failed: %w", err)
 	}
@@ -434,6 +480,31 @@ func (x *Unstructor[T]) DryRun(
 	}
 
 	x.log.Debug("Starting dry run analysis", "group_count", len(sch.group2keys), "field_count", len(sch.json2field))
+
+	// Extract text content from assets for token estimation
+	var textContent string
+	for _, asset := range assets {
+		messages, err := asset.CreateMessages(ctx, x.log)
+		if err != nil {
+			continue // Skip assets that can't create messages
+		}
+
+		// Extract text content for template building (use first text part found)
+		for _, msg := range messages {
+			for _, part := range msg.Parts {
+				if part.Type == "text" && textContent == "" {
+					textContent = part.Text
+					break
+				}
+			}
+			if textContent != "" {
+				break
+			}
+		}
+		if textContent != "" {
+			break
+		}
+	}
 
 	// Simulate the execution loop
 	for pk, keys := range sch.group2keys {
@@ -456,7 +527,7 @@ func (x *Unstructor[T]) DryRun(
 		}
 
 		// Build the full prompt for token estimation
-		fullPrompt := buildPrompt(tpl, keys, doc)
+		fullPrompt := buildPrompt(tpl, keys, textContent)
 
 		// Estimate tokens
 		inputTokens := EstimateTokensFromText(fullPrompt)
@@ -525,4 +596,26 @@ func estimateOutputTokensForFields(fields []string) int {
 // containsField checks if a field name contains a substring (case-insensitive)
 func containsField(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
+
+// UnstructFromText is a convenience method for extracting from a single text document.
+// This provides backward compatibility with the old string-based API.
+func (x *Unstructor[T]) UnstructFromText(
+	ctx context.Context,
+	document string,
+	optFns ...func(*Options),
+) (*T, error) {
+	assets := []Asset{NewTextAsset(document)}
+	return x.Unstruct(ctx, assets, optFns...)
+}
+
+// DryRunFromText is a convenience method for dry-running a single text document.
+// This provides backward compatibility with the old string-based API.
+func (x *Unstructor[T]) DryRunFromText(
+	ctx context.Context,
+	document string,
+	optFns ...func(*Options),
+) (*ExecutionStats, error) {
+	assets := []Asset{NewTextAsset(document)}
+	return x.DryRun(ctx, assets, optFns...)
 }

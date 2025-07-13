@@ -176,9 +176,10 @@ func main() {
 
 		slog.Debug("Starting complex extraction", "document", doc.name, "default_model", "gemini-1.5-flash")
 
+		assets := []unstruct.Asset{unstruct.NewTextAsset(doc.text)}
 		out, err := uno.Unstruct(
 			context.Background(),
-			doc.text,
+			assets,
 			unstruct.WithModel("gemini-1.5-flash"), // Default model, overridden by field-specific models
 			unstruct.WithTimeout(45*time.Second),
 			unstruct.WithRetry(2, 2*time.Second),

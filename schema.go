@@ -27,6 +27,10 @@ type schema struct {
 }
 
 func schemaOf[T any]() (*schema, error) {
+	return schemaOfWithOptions[T](nil)
+}
+
+func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 	var zero T
 	rt := reflect.TypeOf(zero)
 	if rt.Kind() != reflect.Struct {
@@ -59,6 +63,15 @@ func schemaOf[T any]() (*schema, error) {
 			model := tp.model
 			if model == "" {
 				model = inheritedModel
+			}
+
+			// Check for field-specific model override from Options
+			if opts != nil && opts.FieldModels != nil {
+				typeName := t.Name()
+				fieldKey := typeName + "." + f.Name
+				if fieldModel, exists := opts.FieldModels[fieldKey]; exists {
+					model = fieldModel
+				}
 			}
 
 			nextIdx := append(idx, i)

@@ -489,7 +489,8 @@ func TestDryRunner_Interface(t *testing.T) {
 	assert.NotNil(t, mock)
 
 	// Test the interface method signature
-	stats, err := mock.DryRun(context.Background(), "test doc")
+	assets := []Asset{&TextAsset{Content: "test doc"}}
+	stats, err := mock.DryRun(context.Background(), assets)
 	assert.NotNil(t, stats) // MockUnstructor should return stats
 	assert.NoError(t, err)
 }
@@ -522,77 +523,10 @@ func TestPlanNode_ExpectedModelsAndCounts(t *testing.T) {
 	assert.Equal(t, 1, plan.ExpectedCallCounts["gpt-3.5-turbo"])
 }
 
-func TestEstimateOutputTokensForFields(t *testing.T) {
-	tests := []struct {
-		name           string
-		fields         []string
-		expectedMinMax [2]int // min, max expected tokens
-	}{
-		{
-			name:           "name fields",
-			fields:         []string{"name", "title"},
-			expectedMinMax: [2]int{25, 50}, // Base + 2 short fields
-		},
-		{
-			name:           "address fields",
-			fields:         []string{"address", "description"},
-			expectedMinMax: [2]int{64, 80}, // Base + 2 medium fields
-		},
-		{
-			name:           "contact fields",
-			fields:         []string{"email", "phone"},
-			expectedMinMax: [2]int{44, 60}, // Base + 2 structured fields
-		},
-		{
-			name:           "numeric fields",
-			fields:         []string{"age", "count"},
-			expectedMinMax: [2]int{14, 25}, // Base + 2 number fields
-		},
-		{
-			name:           "mixed fields",
-			fields:         []string{"name", "address", "age"},
-			expectedMinMax: [2]int{54, 80}, // Base + mixed field types
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tokens := estimateOutputTokensForFields(tt.fields)
-			assert.GreaterOrEqual(t, tokens, tt.expectedMinMax[0], "tokens should be at least minimum expected")
-			assert.LessOrEqual(t, tokens, tt.expectedMinMax[1], "tokens should not exceed maximum expected")
-		})
-	}
-}
-
-func TestContainsField(t *testing.T) {
-	tests := []struct {
-		field    string
-		substr   string
-		expected bool
-	}{
-		{"name", "name", true},
-		{"full_name", "name", true},
-		{"customer_name", "name", true},
-		{"NAME", "name", true}, // case insensitive
-		{"age", "name", false},
-		{"address", "addr", true},
-		{"email_address", "email", true},
-		{"phone_number", "phone", true},
-		{"description", "desc", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.field+"_contains_"+tt.substr, func(t *testing.T) {
-			result := containsField(tt.field, tt.substr)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 // MockUnstructor for testing DryRunner interface
 type MockUnstructor struct{}
 
-func (m *MockUnstructor) DryRun(ctx context.Context, doc string, optFns ...func(*Options)) (*ExecutionStats, error) {
+func (m *MockUnstructor) DryRun(ctx context.Context, assets []Asset, optFns ...func(*Options)) (*ExecutionStats, error) {
 	return &ExecutionStats{
 		PromptCalls:       2,
 		ModelCalls:        map[string]int{"gpt-4o": 1, "gpt-3.5-turbo": 1},

@@ -9,7 +9,7 @@ import (
 
 // DryRunner interface for types that can perform dry-run execution
 type DryRunner interface {
-	DryRun(ctx context.Context, doc string, optFns ...func(*Options)) (*ExecutionStats, error)
+	DryRun(ctx context.Context, assets []Asset, optFns ...func(*Options)) (*ExecutionStats, error)
 }
 
 // ExecutionStats tracks actual execution statistics for comparison with planned execution.
@@ -242,7 +242,8 @@ func (pb *PlanBuilder) callDryRun() (*ExecutionStats, error) {
 	}
 
 	// Call DryRun with a default configuration
-	return dryRunner.DryRun(context.Background(), pb.document, WithModel("gpt-3.5-turbo"))
+	assets := []Asset{&TextAsset{Content: pb.document}}
+	return dryRunner.DryRun(context.Background(), assets, WithModel("gpt-3.5-turbo"))
 }
 
 // getFieldsFromStats extracts all field names from execution statistics

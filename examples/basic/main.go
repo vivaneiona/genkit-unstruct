@@ -10,7 +10,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/lmittmann/tint"
-	"github.com/vivaneiona/genkit-unstruct"
+	unstruct "github.com/vivaneiona/genkit-unstruct"
 	"google.golang.org/genai"
 )
 
@@ -114,7 +114,7 @@ func main() {
 
 	out, err := uno.Unstruct(
 		context.Background(),
-		doc,
+		unstruct.AssetsFrom(doc),
 		unstruct.WithModel("gemini-1.5-flash"),
 		unstruct.WithTimeout(30*time.Second),
 	)

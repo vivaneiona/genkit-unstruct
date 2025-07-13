@@ -2,6 +2,7 @@ package unstruct
 
 import (
 	"context"
+	"reflect"
 	"time"
 )
 
@@ -30,6 +31,9 @@ type Invoker interface {
 	Generate(ctx context.Context, model Model, prompt string, media []*Part) ([]byte, error)
 }
 
+// FieldModelMap represents model overrides for specific type and field combinations
+type FieldModelMap map[string]string // key: "TypeName.FieldName", value: model name
+
 // Options represents functional options for extraction
 type Options struct {
 	Model            string
@@ -41,7 +45,7 @@ type Options struct {
 	Backoff          time.Duration             // backoff duration for retries
 	CustomParser     func([]byte) (any, error) // override JSON→struct
 	FallbackPrompt   string                    // used when tag.prompt == ""
-	media            []*Part                   // internal use
+	FieldModels      FieldModelMap             // per-field model overrides
 }
 
 // Functional option constructors
@@ -76,10 +80,19 @@ func WithParser(fn func([]byte) (any, error)) func(*Options) {
 	return func(o *Options) { o.CustomParser = fn }
 }
 
-func WithMedia(p ...*Part) func(*Options) {
-	return func(o *Options) { o.media = p }
-}
-
 func WithFallbackPrompt(prompt string) func(*Options) {
 	return func(o *Options) { o.FallbackPrompt = prompt }
+}
+
+// WithModelFor sets a specific model for a particular field of a given type
+// Usage: WithModelFor("gemini-1.5-pro", SomeType{}, "FieldName")
+func WithModelFor(model string, typ any, fieldName string) func(*Options) {
+	return func(o *Options) {
+		if o.FieldModels == nil {
+			o.FieldModels = make(FieldModelMap)
+		}
+		typeName := reflect.TypeOf(typ).Name()
+		key := typeName + "." + fieldName
+		o.FieldModels[key] = model
+	}
 }

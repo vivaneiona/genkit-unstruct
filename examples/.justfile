@@ -9,6 +9,7 @@ mod? plan 'plan/.justfile'
 mod? vision 'vision/.justfile'
 mod? stats_demo 'stats_demo/.justfile'
 mod? test_plan_summary 'test_plan_summary/.justfile'
+mod? assets 'assets/.justfile'
 
 vet:
     #!/usr/bin/env bash
@@ -18,6 +19,3 @@ vet:
             (cd "$dir" && just vet)
         fi
     done
-
-some:
-    just --chooser zfz 

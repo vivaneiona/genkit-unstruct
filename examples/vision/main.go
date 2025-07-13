@@ -134,10 +134,12 @@ Pay attention to document structure and layout for accurate extraction.`, file.U
 
 	fmt.Println("Extracting structured data from image using unstruct...")
 
-	// Extract structured data with timeout and appropriate model
-	result, err := u.Unstruct(ctx, visionInput,
-		unstruct.WithModel("gemini-1.5-pro"), // Use Pro model for vision tasks
-		unstruct.WithTimeout(60*time.Second), // Longer timeout for vision processing
+	// Extract structured data with timeout and field-specific model overrides
+	assets := []unstruct.Asset{unstruct.NewTextAsset(visionInput)}
+	result, err := u.Unstruct(ctx, assets,
+		unstruct.WithModel("gemini-1.5-pro"),                                          // Default model for vision tasks
+		unstruct.WithModelFor("gemini-2.0-flash-exp", DocumentData{}, "DocumentDate"), // Use faster model for simple date extraction
+		unstruct.WithTimeout(60*time.Second),                                          // Longer timeout for vision processing
 	)
 	if err != nil {
 		log.Printf("DETAILED ERROR: %v", err)
