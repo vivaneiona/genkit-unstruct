@@ -26,32 +26,96 @@ func buildPrompt(tpl string, keys []string, doc string) string {
 	return finalPrompt
 }
 
+// traverse returns value and a boolean 'found'.
+func traverse(m map[string]any, path string) (any, bool) {
+	parts := strings.Split(path, ".")
+	cur := any(m)
+	for _, p := range parts {
+		mm, ok := cur.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		cur, ok = mm[p]
+		if !ok {
+			return nil, false
+		}
+	}
+	return cur, true
+}
+
 // patchStruct merges JSON data into the destination struct using dotted keys support
 func patchStruct[T any](dst *T, raw []byte, spec map[string]fieldSpec) error {
 	slog.Debug("Starting JSON merge", "raw_length", len(raw), "spec_size", len(spec))
 
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &m); err != nil {
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
 		slog.Debug("JSON unmarshal failed", "error", err)
 		return err
 	}
-	slog.Debug("Unmarshaled JSON", "key_count", len(m))
+	slog.Debug("Unmarshaled JSON", "key_count", len(payload))
 
-	for key, data := range m {
-		fs, ok := spec[key]
+	vDst := reflect.ValueOf(dst).Elem()
+
+	for path, fs := range spec {
+		val, ok := traverse(payload, path)
 		if !ok {
-			slog.Debug("Field spec not found", "key", key)
+			slog.Debug("Path not found in payload", "path", path)
+			continue // nothing supplied for this key
+		}
+
+		field := vDst.FieldByIndex(fs.index)
+		if !field.CanSet() {
+			slog.Debug("Field cannot be set", "path", path)
 			continue
 		}
-		v := reflect.ValueOf(dst).Elem()
-		for _, idx := range fs.index {
-			v = v.Field(idx)
+
+		// Handle different field types
+		switch field.Kind() {
+		case reflect.String:
+			if s, ok := val.(string); ok {
+				field.SetString(s)
+				slog.Debug("Set string field", "path", path, "value", s)
+			}
+		case reflect.Map, reflect.Struct, reflect.Interface:
+			// For complex types, marshal back to JSON and unmarshal into the field
+			b, err := json.Marshal(val)
+			if err != nil {
+				slog.Debug("Failed to marshal field value", "path", path, "error", err)
+				continue
+			}
+			if err := json.Unmarshal(b, field.Addr().Interface()); err != nil {
+				slog.Debug("Failed to unmarshal into field", "path", path, "error", err)
+				return fmt.Errorf("%s: %w", path, err)
+			}
+			slog.Debug("Set complex field", "path", path)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if i, ok := val.(float64); ok { // JSON numbers are float64
+				field.SetInt(int64(i))
+				slog.Debug("Set int field", "path", path, "value", int64(i))
+			}
+		case reflect.Float32, reflect.Float64:
+			if f, ok := val.(float64); ok {
+				field.SetFloat(f)
+				slog.Debug("Set float field", "path", path, "value", f)
+			}
+		case reflect.Bool:
+			if b, ok := val.(bool); ok {
+				field.SetBool(b)
+				slog.Debug("Set bool field", "path", path, "value", b)
+			}
+		default:
+			// Fallback: try JSON marshal/unmarshal
+			b, err := json.Marshal(val)
+			if err != nil {
+				slog.Debug("Failed to marshal field value", "path", path, "error", err)
+				continue
+			}
+			if err := json.Unmarshal(b, field.Addr().Interface()); err != nil {
+				slog.Debug("Failed to unmarshal into field", "path", path, "error", err)
+				return fmt.Errorf("%s: %w", path, err)
+			}
+			slog.Debug("Set field via fallback", "path", path)
 		}
-		if err := json.Unmarshal(data, v.Addr().Interface()); err != nil {
-			slog.Debug("Field unmarshal failed", "key", key, "error", err)
-			return fmt.Errorf("%s: %w", key, err)
-		}
-		slog.Debug("Patched field", "key", key)
 	}
 	return nil
 }

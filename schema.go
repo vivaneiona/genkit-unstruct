@@ -76,12 +76,23 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 
 			nextIdx := append(idx, i)
 			if isPureStruct(f.Type) {
+				// Make the intermediate node addressable during patching
+				s.json2field[fullKey] = fieldSpec{
+					jsonKey: fullKey,
+					model:   model,
+					index:   nextIdx,
+				}
 				walk(f.Type, fullKey, tp.prompt, model, nextIdx)
 				continue
 			}
 
 			// Handle slices of structs
 			if f.Type.Kind() == reflect.Slice && isPureStruct(f.Type.Elem()) {
+				s.json2field[fullKey] = fieldSpec{
+					jsonKey: fullKey,
+					model:   model,
+					index:   nextIdx,
+				}
 				walk(f.Type.Elem(), fullKey, tp.prompt, model, nextIdx)
 				continue
 			}

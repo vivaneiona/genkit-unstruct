@@ -787,3 +787,104 @@ func TestComprehensiveSyntax(t *testing.T) {
 		}
 	}
 }
+
+// Test for nested struct field mapping issue
+type NestedProject struct {
+	ProjectCode string `json:"ProjectCode" unstruct:"base"`
+	BSNumber    string `json:"BSNumber" unstruct:"base"`
+	BSName      string `json:"BSName" unstruct:"base"`
+	Standards   string `json:"Standards" unstruct:"base"`
+}
+
+type NestedMeta struct {
+	ParserVersion string      `json:"ParserVersion" unstruct:"base"`
+	Timestamp     string      `json:"Timestamp" unstruct:"base"`
+	DocsAnalysed  interface{} `json:"DocsAnalysed" unstruct:"base"`
+}
+
+type AerialsStruct struct {
+	Project NestedProject `json:"Project" unstruct:"base"`
+	Meta    NestedMeta    `json:"Meta" unstruct:"base"`
+}
+
+func TestNestedStructFieldMappingFix(t *testing.T) {
+	t.Run("Schema Generation for Nested Structs", func(t *testing.T) {
+sch, err := schemaOf[AerialsStruct]()
+		if err != nil {
+			t.Fatalf("schemaOf failed: %v", err)
+		}
+
+		// Check if nested struct fields are in the schema
+		expectedFields := []string{
+			"Project.ProjectCode",
+			"Project.BSNumber", 
+			"Project.BSName",
+			"Project.Standards",
+			"Meta.ParserVersion",
+			"Meta.Timestamp",
+			"Meta.DocsAnalysed",
+		}
+
+		for _, field := range expectedFields {
+			if _, exists := sch.json2field[field]; !exists {
+				t.Errorf("Expected field %s to exist in schema", field)
+			}
+		}
+
+		// Check if intermediate struct fields are in the schema (this should be fixed now)
+		intermediateFields := []string{"Project", "Meta"}
+		for _, field := range intermediateFields {
+			if _, exists := sch.json2field[field]; !exists {
+				t.Errorf("❌ STILL BROKEN: Intermediate field %s missing from schema", field)
+			} else {
+				t.Logf("✅ FIXED: Intermediate field %s now exists in schema", field)
+			}
+		}
+
+		// Print schema for debugging
+		t.Logf("Schema fields: %+v", sch.json2field)
+	})
+
+	t.Run("JSON Patching with Nested Structure", func(t *testing.T) {
+// This is the nested JSON that AI returns
+nestedJSON := `{
+			"Project": {
+				"ProjectCode": "TEST-001",
+				"BSNumber": "BS-123", 
+				"BSName": "Test Base Station",
+				"Standards": "LTE-1800"
+			},
+			"Meta": {
+				"ParserVersion": "1.0.0",
+				"Timestamp": "2025-07-14T10:00:00Z",
+				"DocsAnalysed": {"doc1": "analyzed"}
+			}
+		}`
+
+sch, err := schemaOf[AerialsStruct]()
+		if err != nil {
+			t.Fatalf("schemaOf failed: %v", err)
+		}
+
+		var result AerialsStruct
+		err = patchStruct(&result, []byte(nestedJSON), sch.json2field)
+		if err != nil {
+			t.Fatalf("patchStruct failed: %v", err)
+		}
+
+		// Check if nested fields are populated (should be fixed now)
+		if result.Project.ProjectCode != "TEST-001" {
+			t.Errorf("❌ STILL BROKEN: Expected Project.ProjectCode 'TEST-001', got '%s'", result.Project.ProjectCode)
+		} else {
+			t.Logf("✅ FIXED: Project.ProjectCode correctly set to '%s'", result.Project.ProjectCode)
+		}
+		
+		if result.Meta.ParserVersion != "1.0.0" {
+			t.Errorf("❌ STILL BROKEN: Expected Meta.ParserVersion '1.0.0', got '%s'", result.Meta.ParserVersion)
+		} else {
+			t.Logf("✅ FIXED: Meta.ParserVersion correctly set to '%s'", result.Meta.ParserVersion)
+		}
+
+		t.Logf("Final Result: %+v", result)
+	})
+}

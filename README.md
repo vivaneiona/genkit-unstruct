@@ -25,7 +25,6 @@ Traditional text parsing with regex and string manipulation is brittle and time-
 
 **Example transformation:**
 ```go
-// Instead of writing complex regex/parsing code:
 text := "John Doe is 25 years old and lives in New York"
 
 // Just define your structure:
