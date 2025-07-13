@@ -36,7 +36,7 @@ type Person struct {
 }
 
 // Get typed data automatically:
-person, err := u.Unstruct(ctx, text)
+person, err := u.UnstructFromText(ctx, text)
 // Result: Person{Name: "John Doe", Age: 25, City: "New York"}
 ```
 
@@ -48,9 +48,34 @@ person, err := u.Unstruct(ctx, text)
 - **Concurrent Processing**: Multiple extractions run in parallel with configurable concurrency
 - **Type Safety**: Strongly-typed Go structs with compile-time guarantees
 - **Template Support**: Support for Stick templates and custom prompt providers
-- **Vision Support**: Extract structured data from images using Genkit Files API
+- **Multi-Modal Support**: Extract structured data from text, images, and mixed content via Asset interface
 - **Cost Estimation**: Built-in cost estimation and token counting
 - **Retry Logic**: Configurable retry mechanisms with exponential backoff
+
+## API Overview
+
+The library provides two main approaches for extraction:
+
+### Asset-Based API (Recommended)
+```go
+// Main extraction method - supports multiple input types
+func (x *Unstructor[T]) Unstruct(ctx context.Context, assets []Asset, optFns ...func(*Options)) (*T, error)
+
+// Create different asset types
+unstruct.NewTextAsset(content string) *TextAsset
+unstruct.NewImageAsset(data []byte, mimeType string) *ImageAsset  
+unstruct.NewMultiModalAsset(text string, media ...*Part) *MultiModalAsset
+```
+
+### Convenience Methods
+```go
+// For simple text extraction (backward compatibility)
+func (x *Unstructor[T]) UnstructFromText(ctx context.Context, document string, optFns ...func(*Options)) (*T, error)
+
+// For cost estimation and planning
+func (x *Unstructor[T]) DryRun(ctx context.Context, assets []Asset, optFns ...func(*Options)) (*ExecutionStats, error)
+func (x *Unstructor[T]) DryRunFromText(ctx context.Context, document string, optFns ...func(*Options)) (*ExecutionStats, error)
+```
 
 ## Nested Structures
 
@@ -81,7 +106,7 @@ type Project struct {
 }
 
 // To handle fields without prompts, use WithFallbackPrompt option:
-result, err := u.Unstruct(ctx, text, 
+result, err := u.UnstructFromText(ctx, text, 
     unstruct.WithFallbackPrompt("extract-general"), // explicit fallback required
     unstruct.WithModel("gemini-1.5-flash"),
 )
@@ -116,6 +141,7 @@ import (
     "fmt"
     
     "github.com/vivaneiona/genkit-unstruct"
+    "google.golang.org/genai"
 )
 
 type Person struct {
@@ -126,17 +152,60 @@ type Person struct {
 func main() {
     ctx := context.Background()
     
-    // Initialize unstructor with prompt provider
-    u := unstruct.New(prompts)
+    // Initialize Genai client
+    client, err := genai.NewClient(ctx, genai.WithAPIKey("your-api-key"))
+    if err != nil {
+        panic(err)
+    }
+    defer client.Close()
     
-    // Extract data from text
-    person, err := u.Unstruct(ctx, "John Doe is 25 years old")
+    // Initialize unstructor with client and prompt provider
+    u := unstruct.New[Person](client, prompts)
+    
+    // Method 1: Extract from text (convenience method)
+    person, err := u.UnstructFromText(ctx, "John Doe is 25 years old")
+    if err != nil {
+        panic(err)
+    }
+    
+    // Method 2: Extract using Asset interface (supports multiple inputs)
+    assets := []unstruct.Asset{
+        unstruct.NewTextAsset("John Doe is 25 years old"),
+    }
+    person2, err := u.Unstruct(ctx, assets)
     if err != nil {
         panic(err)
     }
     
     fmt.Printf("%+v\n", person)
 }
+```
+
+### Multi-Modal Usage
+
+The Asset interface enables multi-modal extraction from text, images, and mixed content:
+
+```go
+// Extract from image
+imageData := readImageFile("document.png") // your image loading code
+assets := []unstruct.Asset{
+    unstruct.NewImageAsset(imageData, "image/png"),
+}
+result, err := u.Unstruct(ctx, assets)
+
+// Extract from mixed content (text + image)
+assets := []unstruct.Asset{
+    unstruct.NewMultiModalAsset("Extract data from this document:", 
+        unstruct.NewImagePart(imageData, "image/png")),
+}
+result, err := u.Unstruct(ctx, assets)
+
+// Extract from multiple text documents
+assets := []unstruct.Asset{
+    unstruct.NewTextAsset("First document content"),
+    unstruct.NewTextAsset("Second document content"),
+}
+result, err := u.Unstruct(ctx, assets)
 ```
 
 ### Error Handling for Missing Prompts
@@ -148,13 +217,13 @@ type BadStruct struct {
 }
 
 // This will fail
-result, err := u.Unstruct(ctx, "John Doe is 25 years old")
+result, err := u.UnstructFromText(ctx, "John Doe is 25 years old")
 if err != nil {
     // Error: "no prompt specified for field 'age' and no fallback prompt provided"
 }
 
 // This will succeed with explicit fallback
-result, err := u.Unstruct(ctx, "John Doe is 25 years old", 
+result, err := u.UnstructFromText(ctx, "John Doe is 25 years old", 
     unstruct.WithFallbackPrompt("extract-all"))
 ```
 ```
