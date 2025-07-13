@@ -10,6 +10,8 @@ mod? vision 'vision/.justfile'
 mod? stats_demo 'stats_demo/.justfile'
 mod? test_plan_summary 'test_plan_summary/.justfile'
 mod? assets 'assets/.justfile'
+mod? openai 'openai/.justfile'
+mod? vertexai 'vertexai/.justfile'
 
 vet:
     #!/usr/bin/env bash
