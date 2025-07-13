@@ -26,8 +26,8 @@ type Request struct {
 			Address string `json:"address"`
 		} `json:"participant"`
 
-		Company    Company  
-		Affiliated []Company 
+		Company    Company
+		Affiliated []Company
 	} `json:"complexProject" unstruct:"prompt-name,gemini-1.5-pro"`
 }
 
@@ -161,7 +161,7 @@ func TestSingleCallWithParentStructModel(t *testing.T) {
 
 	// The current implementation creates 4 groups based on parent paths:
 	// 1. complexProject (direct fields)
-	// 2. complexProject.participant (nested struct)  
+	// 2. complexProject.participant (nested struct)
 	// 3. complexProject.Company (embedded struct)
 	// 4. complexProject.Affiliated (slice of structs)
 	expectedGroups := 4
@@ -180,7 +180,7 @@ func TestSingleCallWithParentStructModel(t *testing.T) {
 		}
 		totalFields += len(keys)
 	}
-	
+
 	// Should include all fields from the complex project structure
 	expectedTotalFields := 12 // projectColor, projectMode, projectName, certIssuer, lat, lon, participant.name, participant.address, Company.name, Company.address, Affiliated.name, Affiliated.address
 	if totalFields != expectedTotalFields {
@@ -204,8 +204,8 @@ type UserRequestedStructure struct {
 			Address string `json:"address"`
 		} `json:"participant"`
 
-		Company    Company  
-		Affiliated []Company 
+		Company    Company
+		Affiliated []Company
 	} `json:"complexProject" unstruct:"prompt-name,gemini-1.5-pro"`
 }
 
@@ -228,7 +228,7 @@ func TestSingleCallDryRunWithUnstruct(t *testing.T) {
 
 	// The current implementation creates 4 groups based on parent paths:
 	// 1. complexProject (direct fields)
-	// 2. complexProject.participant (nested struct)  
+	// 2. complexProject.participant (nested struct)
 	// 3. complexProject.Company (embedded struct)
 	// 4. complexProject.Affiliated (slice of structs)
 	expectedGroups := 4
@@ -265,7 +265,7 @@ func TestSingleCallDryRunWithUnstruct(t *testing.T) {
 		}
 	}
 
-	t.Logf("SUCCESS: Structure correctly grouped by parent paths - PromptGroups: %d, PromptCalls: %d, Model: gemini-1.5-pro used %d times", 
+	t.Logf("SUCCESS: Structure correctly grouped by parent paths - PromptGroups: %d, PromptCalls: %d, Model: gemini-1.5-pro used %d times",
 		stats.PromptGroups, stats.PromptCalls, stats.ModelCalls["gemini-1.5-pro"])
 }
 
@@ -325,6 +325,6 @@ func TestSingleCallDryRunWithFlattenGroups(t *testing.T) {
 		t.Errorf("Expected at least %d fields, got %d: %v", expectedMinFields, len(group.Fields), group.Fields)
 	}
 
-	t.Logf("SUCCESS: Single call verified with FlattenGroups - PromptGroups: %d, PromptCalls: %d, Model: %s, Fields: %d", 
+	t.Logf("SUCCESS: Single call verified with FlattenGroups - PromptGroups: %d, PromptCalls: %d, Model: %s, Fields: %d",
 		stats.PromptGroups, stats.PromptCalls, group.Model, len(group.Fields))
 }
