@@ -1,5 +1,27 @@
 # genkit-unstruct
-[![Go Report Card](https://goreportcard.com/badge/github.com/vivaneiona/genkit-unstruct)](https://goreportcard.com/report/github.com/vivaneiona/genkit-unstruct)
+[![Go Report Card](https://goreportcard.com/badge/github.com### Core ideas
+- Tags drive extraction – every struct field declares its prompt/model in unstruct:"…".
+- Batch by prompt – fields that share a prompt are requested once.
+- Run in parallel – different prompt groups execute concurrently.
+- Typed result – output is the same struct you defined; no manual parsing.
+
+### Group-based extraction
+
+You can define reusable groups with specific prompts and models:
+
+```go
+type Person struct {
+    Name string `json:"name" unstruct:"group/basic-info"`
+    Age  int    `json:"age"  unstruct:"group/basic-info"`
+    City string `json:"city" unstruct:"group/basic-info"`
+}
+
+// Use WithGroup to define the group configuration
+u := unstruct.New[Person](client, prompts)
+result, err := u.UnstructFromText(ctx, "John, 25, NYC",
+    unstruct.WithGroup("basic-info", "basic", "gemini-2.0-flash"),
+)
+```neiona/genkit-unstruct)](https://goreportcard.com/report/github.com/vivaneiona/genkit-unstruct)
 
 
 Small, typed, concurrent: extract structured data from unstructured text (or images) with a single call, built on Google Genkit.
@@ -27,9 +49,9 @@ import (
 )
 
 type Person struct {
-	Name string `json:"name" unstruct:"basic,gemini-2.0-flash"`
-	Age  int    `json:"age"  unstruct:"basic,gemini-2.5-pro"`
-	City string `json:"city" unstruct:"basic,gemini-2.5-pro"`
+	Name string `json:"name" unstruct:"group/basic-info"`
+	Age  int    `json:"age"  unstruct:"group/basic-info"`
+	City string `json:"city" unstruct:"group/basic-info"`
 }
 
 func main() {
@@ -49,7 +71,9 @@ func main() {
 	}
 
 	u := unstruct.New[Person](client, prompts)       // prompts is any PromptProvider
-	p, _ := u.UnstructFromText(ctx, "John, 25, NYC") // handle error
+	p, _ := u.UnstructFromText(ctx, "John, 25, NYC", 
+		unstruct.WithGroup("basic-info", "basic", "gemini-2.0-flash"),
+	) // handle error
 
 	fmt.Printf("%+v\n", p) // → {Name:John Age:25 City:NYC}
 }
@@ -106,6 +130,7 @@ unstruct.NewMultiModalAsset(text, media...)
 unstruct:"prompt"                 // use prompt, default model
 unstruct:"prompt,gemini-flash"    // custom prompt + model
 unstruct:"gemini-pro"             // inherit parent prompt, override model
+unstruct:"group/group-name"       // use named group (defined with WithGroup)
 ```
 
 Minimal feature list

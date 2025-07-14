@@ -11,6 +11,7 @@ mod? stats_demo 'stats_demo/.justfile'
 mod? assets 'assets/.justfile'
 mod? openai 'openai/.justfile'
 mod? vertexai 'vertexai/.justfile'
+mod? groups 'groups/.justfile'
 
 vet:
     #!/usr/bin/env bash

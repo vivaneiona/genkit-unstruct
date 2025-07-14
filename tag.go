@@ -14,6 +14,7 @@ type tagParts struct {
 // - "PROMPTNAME,MODELNAME" → explicit prompt and model
 // - "model/{modelname}" → model-only format
 // - "prompt/{promptname}" → prompt-only format
+// - "group/{groupname}" → use named group definition
 // - "anything_else" → treated as prompt unless it looks like a model name
 func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 	if tag == "" {
@@ -32,6 +33,11 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 		} else if strings.HasPrefix(items[0], "prompt/") {
 			// prompt/{promptname} format - extract prompt, no model specified
 			tp.prompt = strings.TrimPrefix(items[0], "prompt/")
+			tp.model = ""
+		} else if strings.HasPrefix(items[0], "group/") {
+			// group/{groupname} format - will be resolved later with group definitions
+			groupName := strings.TrimPrefix(items[0], "group/")
+			tp.prompt = "group:" + groupName // special marker for group resolution
 			tp.model = ""
 		} else if looksLikeModel(items[0]) {
 			// Bare model name - inherit prompt, set model

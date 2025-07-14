@@ -34,19 +34,27 @@ type Invoker interface {
 // FieldModelMap represents model overrides for specific type and field combinations
 type FieldModelMap map[string]string // key: "TypeName.FieldName", value: model name
 
+// GroupDefinition represents a named group configuration with prompt and model
+type GroupDefinition struct {
+	Name   string
+	Prompt string
+	Model  string
+}
+
 // Options represents functional options for extraction
 type Options struct {
 	Model            string
 	Timeout          time.Duration
-	Runner           Runner                    // nil → DefaultRunner
-	OutputSchemaJSON string                    // optional JSON-Schema
-	Streaming        bool                      // opt-in
-	MaxRetries       int                       // 0 → no retry
-	Backoff          time.Duration             // backoff duration for retries
-	CustomParser     func([]byte) (any, error) // override JSON→struct
-	FallbackPrompt   string                    // used when tag.prompt == ""
-	FieldModels      FieldModelMap             // per-field model overrides
-	FlattenGroups    bool                      // if true, ignore parent paths when grouping by prompt+model
+	Runner           Runner                     // nil → DefaultRunner
+	OutputSchemaJSON string                     // optional JSON-Schema
+	Streaming        bool                       // opt-in
+	MaxRetries       int                        // 0 → no retry
+	Backoff          time.Duration              // backoff duration for retries
+	CustomParser     func([]byte) (any, error)  // override JSON→struct
+	FallbackPrompt   string                     // used when tag.prompt == ""
+	FieldModels      FieldModelMap              // per-field model overrides
+	FlattenGroups    bool                       // if true, ignore parent paths when grouping by prompt+model
+	Groups           map[string]GroupDefinition // named group definitions
 }
 
 // Functional option constructors
@@ -103,4 +111,20 @@ func WithModelFor(model string, typ any, fieldName string) func(*Options) {
 // regardless of their parent path, resulting in fewer API calls
 func WithFlattenGroups() func(*Options) {
 	return func(o *Options) { o.FlattenGroups = true }
+}
+
+// WithGroup defines a named group with a specific prompt and model
+// Usage: WithGroup("group-name", "prompt-name", "model-name")
+// Fields can then reference this group using unstruct:"group/group-name"
+func WithGroup(name, prompt, model string) func(*Options) {
+	return func(o *Options) {
+		if o.Groups == nil {
+			o.Groups = make(map[string]GroupDefinition)
+		}
+		o.Groups[name] = GroupDefinition{
+			Name:   name,
+			Prompt: prompt,
+			Model:  model,
+		}
+	}
 }

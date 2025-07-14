@@ -59,8 +59,20 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 			fullKey := joinKey(parent, jsonKey)
 			tp := parseUnstructTag(f.Tag.Get("unstruct"), inheritedPrompt)
 
-			// Inherit model if not specified in the tag
+			// Resolve group references
+			prompt := tp.prompt
 			model := tp.model
+			if strings.HasPrefix(tp.prompt, "group:") {
+				groupName := strings.TrimPrefix(tp.prompt, "group:")
+				if opts != nil && opts.Groups != nil {
+					if groupDef, exists := opts.Groups[groupName]; exists {
+						prompt = groupDef.Prompt
+						model = groupDef.Model
+					}
+				}
+			}
+
+			// Inherit model if not specified in the tag and not from group
 			if model == "" {
 				model = inheritedModel
 			}
@@ -82,7 +94,7 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 					model:   model,
 					index:   nextIdx,
 				}
-				walk(f.Type, fullKey, tp.prompt, model, nextIdx)
+				walk(f.Type, fullKey, prompt, model, nextIdx)
 				continue
 			}
 
@@ -93,7 +105,7 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 					model:   model,
 					index:   nextIdx,
 				}
-				walk(f.Type.Elem(), fullKey, tp.prompt, model, nextIdx)
+				walk(f.Type.Elem(), fullKey, prompt, model, nextIdx)
 				continue
 			}
 
@@ -103,7 +115,7 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 				parentPathForGrouping = ""
 			}
 
-			pk := promptKey{prompt: tp.prompt, parentPath: parentPathForGrouping, model: model}
+			pk := promptKey{prompt: prompt, parentPath: parentPathForGrouping, model: model}
 			s.group2keys[pk] = append(s.group2keys[pk], fullKey)
 			s.json2field[fullKey] = fieldSpec{
 				jsonKey: fullKey, model: model, index: nextIdx,
