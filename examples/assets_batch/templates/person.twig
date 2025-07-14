@@ -15,6 +15,12 @@ Focus on:
 - Job titles and departments
 - Team or organizational structure
 
+IMPORTANT FOR PROJECT LEAD:
+- Look for terms like "Project Lead:", "Team Lead:", "Manager:", "Lead:", etc.
+- Extract the full name that appears after these terms
+- For example: "Project Lead: Jane Doe" should extract "Jane Doe"
+- For example: "Team Lead: Michael Chen" should extract "Michael Chen"
+
 Return as a JSON object with the exact field names from the Keys list.
 
 Document content: {{ Document }}

@@ -143,67 +143,6 @@ func TestFormatAsJSON(t *testing.T) {
 	}
 }
 
-func TestFormatAsGraphviz(t *testing.T) {
-	builder := NewPlanBuilder()
-
-	schema := map[string]interface{}{
-		"fields": []string{"Name"},
-	}
-
-	builder.WithSchema(schema)
-
-	dotOutput, err := builder.ExplainPretty(FormatGraphviz)
-	if err != nil {
-		t.Fatalf("Failed to format as Graphviz: %v", err)
-	}
-
-	// Verify DOT output contains expected elements
-	expectedStrings := []string{
-		"digraph UnstructorPlan",
-		"rankdir=TB",
-		"node0",
-		"->",
-		"SchemaAnalysis",
-		"PromptCall",
-		"MergeFragments",
-	}
-
-	for _, expected := range expectedStrings {
-		if !contains(dotOutput, expected) {
-			t.Errorf("DOT output should contain '%s'", expected)
-		}
-	}
-}
-
-func TestFormatAsHTML(t *testing.T) {
-	builder := NewPlanBuilder()
-
-	schema := map[string]interface{}{
-		"fields": []string{"Name"},
-	}
-
-	builder.WithSchema(schema)
-
-	htmlOutput, err := builder.ExplainPretty(FormatHTML)
-	if err != nil {
-		t.Fatalf("Failed to format as HTML: %v", err)
-	}
-
-	// Verify HTML output contains expected elements
-	expectedStrings := []string{
-		"<!DOCTYPE html>",
-		"<title>Unstructor Execution Plan</title>",
-		"SchemaAnalysis",
-		"PromptCall",
-	}
-
-	for _, expected := range expectedStrings {
-		if !contains(htmlOutput, expected) {
-			t.Errorf("HTML output should contain '%s'", expected)
-		}
-	}
-}
-
 func TestTokenEstimation(t *testing.T) {
 	// Test text-based estimation
 	text := "This is a sample text for token estimation."
@@ -402,7 +341,7 @@ func TestPlanBuilder_CallDryRun_NoUnstructor(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, stats)
-	assert.Contains(t, err.Error(), "unstructor or sample document not configured")
+	assert.Contains(t, err.Error(), "unstructor not configured")
 }
 
 func TestPlanBuilder_CallDryRun_NoDocument(t *testing.T) {
@@ -413,7 +352,7 @@ func TestPlanBuilder_CallDryRun_NoDocument(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, stats)
-	assert.Contains(t, err.Error(), "unstructor or sample document not configured")
+	assert.Contains(t, err.Error(), "sample document not configured")
 }
 
 func TestPlanBuilder_CallDryRun_NotDryRunner(t *testing.T) {

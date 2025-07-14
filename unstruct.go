@@ -566,6 +566,88 @@ func (x *Unstructor[T]) DryRun(
 	return stats, nil
 }
 
+// Explain performs a dry run and returns a human-readable execution plan.
+// This is a convenience method that combines DryRun with text formatting.
+func (x *Unstructor[T]) Explain(
+	ctx context.Context,
+	assets []Asset,
+	optFns ...func(*Options),
+) (string, error) {
+	// Get execution statistics from dry run
+	stats, err := x.DryRun(ctx, assets, optFns...)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert execution stats to a plan node
+	plan := statsToPlan(stats)
+
+	// Use the plan builder to format as text
+	builder := NewPlanBuilder()
+	return builder.formatAsText(plan), nil
+}
+
+// statsToPlan converts ExecutionStats to a PlanNode for formatting
+func statsToPlan(stats *ExecutionStats) *PlanNode {
+	// Create root SchemaAnalysis node
+	fields := make([]string, 0)
+	for _, group := range stats.GroupDetails {
+		fields = append(fields, group.Fields...)
+	}
+
+	// Remove duplicates
+	uniqueFields := extractUniqueStrings(fields)
+
+	rootNode := &PlanNode{
+		Type:               SchemaAnalysisType,
+		Fields:             uniqueFields,
+		InputTokens:        10, // Schema analysis overhead
+		EstCost:            float64(stats.PromptGroups) * SchemaAnalysisBaseCost,
+		Children:           make([]*PlanNode, 0),
+		ExpectedModels:     make([]string, 0, len(stats.ModelCalls)),
+		ExpectedCallCounts: stats.ModelCalls,
+	}
+
+	// Add models from stats
+	for model := range stats.ModelCalls {
+		rootNode.ExpectedModels = append(rootNode.ExpectedModels, model)
+	}
+
+	// Create PromptCall nodes from execution statistics
+	for _, groupExec := range stats.GroupDetails {
+		promptNode := &PlanNode{
+			Type:         PromptCallType,
+			PromptName:   groupExec.PromptName,
+			Model:        groupExec.Model,
+			Fields:       groupExec.Fields,
+			InputTokens:  groupExec.InputTokens,
+			OutputTokens: groupExec.OutputTokens,
+			EstCost:      PromptCallBaseCost + float64(groupExec.InputTokens)*PromptCallTokenFactor,
+			Children:     make([]*PlanNode, 0),
+		}
+
+		rootNode.Children = append(rootNode.Children, promptNode)
+	}
+
+	// Create MergeFragments node
+	mergeNode := &PlanNode{
+		Type:     MergeFragmentsType,
+		Fields:   uniqueFields,
+		EstCost:  MergeFragmentsBaseCost + float64(len(uniqueFields))*MergeFragmentsPerField,
+		Children: make([]*PlanNode, 0),
+	}
+	rootNode.Children = append(rootNode.Children, mergeNode)
+
+	// Update root cost to include children
+	totalChildCost := 0.0
+	for _, child := range rootNode.Children {
+		totalChildCost += child.EstCost
+	}
+	rootNode.EstCost += totalChildCost
+
+	return rootNode
+}
+
 // estimateOutputTokensForFields estimates output tokens based on field types and count
 func estimateOutputTokensForFields(fields []string) int {
 	// Base JSON structure overhead
@@ -618,4 +700,15 @@ func (x *Unstructor[T]) DryRunFromText(
 ) (*ExecutionStats, error) {
 	assets := []Asset{NewTextAsset(document)}
 	return x.DryRun(ctx, assets, optFns...)
+}
+
+// ExplainFromText is a convenience method for explaining extraction from a single text document.
+// This provides backward compatibility with the old string-based API.
+func (x *Unstructor[T]) ExplainFromText(
+	ctx context.Context,
+	document string,
+	optFns ...func(*Options),
+) (string, error) {
+	assets := []Asset{NewTextAsset(document)}
+	return x.Explain(ctx, assets, optFns...)
 }

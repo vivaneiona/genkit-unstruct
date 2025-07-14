@@ -62,18 +62,8 @@ func main() {
 	}
 	fmt.Println(jsonPlan)
 
-	// Example 4: Graphviz DOT format for visualization
-	fmt.Println("\n4. Graphviz DOT Format (for visualization)")
-
-	dotPlan, err := builder.ExplainPretty(unstruct.FormatGraphviz)
-	if err != nil {
-		log.Fatalf("Error generating DOT plan: %v", err)
-	}
-	fmt.Println(dotPlan)
-	fmt.Println("\n# Copy the above DOT code to https://dreampuf.github.io/GraphvizOnline/ for visualization")
-
-	// Example 5: Demonstrate cost analysis
-	fmt.Println("\n5. Cost Analysis Summary")
+	// Example 4: Demonstrate cost analysis
+	fmt.Println("\n4. Cost Analysis Summary")
 
 	plan, err := builder.ExplainWithCosts(pricing)
 	if err != nil {
@@ -133,20 +123,8 @@ func main() {
 		fmt.Printf("  %s: $%.6f (%d tokens)\n", model, cost, tokens)
 	}
 
-	// Example 6: HTML format
-	fmt.Println("\n6. Generating HTML Report")
-
-	htmlPlan, err := builder.ExplainPretty(unstruct.FormatHTML)
-	if err != nil {
-		log.Fatalf("Error generating HTML plan: %v", err)
-	}
-
-	// Write to file (in a real application)
-	fmt.Println("HTML report generated (would write to file in real application)")
-	fmt.Printf("HTML length: %d characters\n", len(htmlPlan))
-
-	// Example 7: Token estimation utilities
-	fmt.Println("\n7. Token Estimation Utilities")
+	// Example 5: Token estimation utilities
+	fmt.Println("\n5. Token Estimation Utilities")
 
 	sampleText := "John Doe is a software engineer with 5 years of experience in Go, Python, and JavaScript. He graduated from MIT with a degree in Computer Science."
 
