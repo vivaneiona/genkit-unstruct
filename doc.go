@@ -13,6 +13,7 @@
 //   - Type conversion overhead: Converting extracted strings to proper Go types manually
 //   - Poor performance: Making individual API calls to AI models for each field
 //   - Maintenance burden: Updating parsers when text formats change
+//   - File handling complexity: Converting documents to text before processing
 //
 // The unstruct package solves this by providing:
 //
@@ -20,6 +21,7 @@
 //   - Intelligent batching: Groups fields by prompt to minimize expensive AI API calls
 //   - Concurrent processing: Extracts different data types in parallel for speed
 //   - Type safety: Direct conversion to Go structs with compile-time guarantees
+//   - Native file support: Direct processing of PDFs, Word docs, and other file formats
 //
 // # Basic Usage
 //
@@ -63,6 +65,61 @@
 //	        unstruct.NewImagePart(imageData, "image/png")),
 //	}
 //	result, err := u.Unstruct(ctx, assets)
+//
+//	// File extraction (uploaded to Google Files API)
+//	assets := []unstruct.Asset{
+//	    unstruct.NewFileAsset(client, "document.pdf"),
+//	}
+//	result, err := u.Unstruct(ctx, assets)
+//
+//	// Batch file processing
+//	filePaths := []string{"doc1.pdf", "doc2.md", "doc3.txt"}
+//	assets := []unstruct.Asset{
+//	    unstruct.NewBatchFileAsset(client, filePaths),
+//	}
+//	result, err := u.Unstruct(ctx, assets)
+//
+//	// Mixed content (text + image + files)
+//	assets := []unstruct.Asset{
+//	    unstruct.NewTextAsset("Extract data from these documents:"),
+//	    unstruct.NewFileAsset(client, "requirements.pdf"),
+//	    unstruct.NewImageAsset(imageData, "image/png"),
+//	}
+//	result, err := u.Unstruct(ctx, assets)
+//
+// # File Processing
+//
+// The package provides robust file processing capabilities through the Google Files API.
+// Files are automatically uploaded and processed by AI models that can analyze various
+// document formats including PDFs, Word documents, text files, and more.
+//
+//	// Single file processing with options
+//	fileAsset := unstruct.NewFileAsset(client, "project-requirements.pdf")
+//	fileAsset.DisplayName = "Project Requirements Document"
+//	fileAsset.AutoCleanup = true  // Clean up after processing
+//	fileAsset.IncludeMetadata = true  // Include file size, checksum, etc.
+//
+//	result, err := u.Unstruct(ctx, []unstruct.Asset{fileAsset})
+//
+//	// Batch file processing with progress tracking
+//	filePaths := []string{
+//	    "meeting-notes.md",
+//	    "technical-spec.pdf",
+//	    "user-requirements.docx",
+//	}
+//
+//	batchAsset := unstruct.NewBatchFileAsset(client, filePaths,
+//	    unstruct.WithBatchProgressCallback(func(processed, total int, currentFile string) {
+//	        fmt.Printf("Processing %d/%d: %s\n", processed, total, currentFile)
+//	    }),
+//	    unstruct.WithBatchAutoCleanup(true),
+//	)
+//	result, err := u.Unstruct(ctx, []unstruct.Asset{batchAsset})
+//
+// Files are uploaded to Google's Files API where they become available to Gemini models
+// for content analysis. The AI can read and extract structured data from file contents,
+// not just metadata. All file uploads are automatically cleaned up after processing
+// when AutoCleanup is enabled.
 //
 // # Nested Structures
 //
@@ -155,8 +212,15 @@
 //
 //   - Text documents via TextAsset
 //   - Images via ImageAsset (PNG, JPEG, etc.)
+//   - Files via FileAsset (PDFs, Word docs, text files, etc.)
+//   - Batch file processing via BatchFileAsset
 //   - Mixed content via MultiModalAsset
 //   - Multiple documents in a single extraction
+//
+// File assets are automatically uploaded to Google's Files API and processed
+// by Gemini models that can analyze document content, not just metadata.
+// Supported file types include PDFs, Word documents, text files, markdown,
+// and other formats supported by Gemini models.
 //
 // # Template Support
 //
