@@ -1,8 +1,9 @@
-Extract contact information from this document.
+Extract work-related information from this document.
 
 Focus on identifying:
-- Email addresses
-- Phone numbers
+- Job positions and titles
+- Salaries and compensation
+- Departments and organizational details
 
 Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 

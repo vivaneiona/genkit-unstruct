@@ -1,4 +1,4 @@
-module groups
+module real_groups_test
 
 go 1.24.1
 
@@ -7,7 +7,7 @@ toolchain go1.24.3
 replace github.com/vivaneiona/genkit-unstruct => ../..
 
 require (
-	github.com/vivaneiona/genkit-unstruct v0.0.0-00010101000000-000000000000
+	github.com/vivaneiona/genkit-unstruct v0.0.0
 	google.golang.org/genai v1.15.0
 )
 
@@ -24,7 +24,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/tyler-sommer/stick v1.0.6 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect

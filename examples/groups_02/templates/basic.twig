@@ -1,8 +1,9 @@
-Extract address information from this document.
+Extract basic information from this document.
 
 Focus on identifying:
-- Street addresses
-- Location information
+- Names
+- Ages
+- Basic details
 
 Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
