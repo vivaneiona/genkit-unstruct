@@ -5,6 +5,7 @@ go 1.24.1
 toolchain go1.24.3
 
 require (
+	github.com/gabriel-vasile/mimetype v1.4.9
 	github.com/stretchr/testify v1.10.0
 	github.com/tyler-sommer/stick v1.0.6
 	golang.org/x/sync v0.15.0

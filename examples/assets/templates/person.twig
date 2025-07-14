@@ -1,0 +1,20 @@
+Extract person/contact information from this document.
+
+Look for:
+- Names of people (authors, managers, team members, etc.)
+- Contact information (email addresses, phone numbers)
+- Job titles and roles
+- Organizational relationships
+
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+Focus on:
+- Full names of individuals
+- Professional email addresses
+- Phone numbers with country codes
+- Job titles and departments
+- Team or organizational structure
+
+Return as a JSON object with the exact field names from the Keys list.
+
+Document content: {{ Document }}

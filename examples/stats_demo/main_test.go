@@ -11,17 +11,17 @@ import (
 
 func TestSimplePromptProvider(t *testing.T) {
 	provider := NewSimplePromptProvider()
-	
+
 	// Test existing template
 	template, err := provider.GetPrompt("person-info", 1)
 	if err != nil {
 		t.Fatalf("Expected template to exist, got error: %v", err)
 	}
-	
+
 	if !strings.Contains(template, "Extract personal information") {
 		t.Errorf("Template should contain expected content")
 	}
-	
+
 	// Test non-existing template
 	_, err = provider.GetPrompt("non-existent", 1)
 	if err == nil {
@@ -47,15 +47,15 @@ func TestExecutionStatsStructure(t *testing.T) {
 			},
 		},
 	}
-	
+
 	if stats.PromptCalls != 2 {
 		t.Errorf("Expected 2 prompt calls, got %d", stats.PromptCalls)
 	}
-	
+
 	if len(stats.ModelCalls) != 2 {
 		t.Errorf("Expected 2 model entries, got %d", len(stats.ModelCalls))
 	}
-	
+
 	if len(stats.GroupDetails) != 1 {
 		t.Errorf("Expected 1 group detail, got %d", len(stats.GroupDetails))
 	}
@@ -66,27 +66,27 @@ func TestDemoWithoutAPI(t *testing.T) {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
-	
+
 	sampleDoc := "Test document"
 	demoWithoutAPI(sampleDoc)
-	
+
 	// Restore stdout
 	w.Close()
 	os.Stdout = old
-	
+
 	var buf bytes.Buffer
 	buf.ReadFrom(r)
 	output := buf.String()
-	
+
 	// Check that demo output contains expected elements
 	if !strings.Contains(output, "Demo Statistics") {
 		t.Error("Demo output should contain 'Demo Statistics'")
 	}
-	
+
 	if !strings.Contains(output, "person-info") {
 		t.Error("Demo output should contain prompt names")
 	}
-	
+
 	if !strings.Contains(output, "Token Analysis") {
 		t.Error("Demo output should contain token analysis")
 	}
@@ -100,19 +100,19 @@ func TestTestDocumentStructure(t *testing.T) {
 		Email:   "john@example.com",
 		Address: "123 Main St",
 	}
-	
+
 	if doc.Name == "" {
 		t.Error("Name field should be set")
 	}
-	
+
 	if doc.Age == 0 {
 		t.Error("Age field should be set")
 	}
-	
+
 	if doc.Email == "" {
 		t.Error("Email field should be set")
 	}
-	
+
 	if doc.Address == "" {
 		t.Error("Address field should be set")
 	}
@@ -137,23 +137,23 @@ func TestPrintFunctions(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Capture stdout to avoid output during testing
 	old := os.Stdout
 	_, w, _ := os.Pipe()
 	os.Stdout = w
-	
+
 	// Test functions don't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Print function panicked: %v", r)
 		}
 	}()
-	
+
 	printExecutionStats(stats)
 	printTokenAnalysis(stats)
 	printSectionHeader("Test Section")
-	
+
 	// Restore stdout
 	w.Close()
 	os.Stdout = old
@@ -164,15 +164,15 @@ func TestMainDemoFlow(t *testing.T) {
 	// Save original environment
 	originalKey := os.Getenv("GEMINI_API_KEY")
 	defer os.Setenv("GEMINI_API_KEY", originalKey)
-	
+
 	// Unset API key to trigger demo mode
 	os.Unsetenv("GEMINI_API_KEY")
-	
+
 	// Capture stdout
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
-	
+
 	// Run main (this should trigger demo mode)
 	func() {
 		defer func() {
@@ -182,28 +182,28 @@ func TestMainDemoFlow(t *testing.T) {
 		}()
 		main()
 	}()
-	
+
 	// Restore stdout
 	w.Close()
 	os.Stdout = old
-	
+
 	var buf bytes.Buffer
 	buf.ReadFrom(r)
 	output := buf.String()
-	
+
 	// Verify demo mode was triggered
 	if !strings.Contains(output, "demo mode") {
 		t.Error("Should have triggered demo mode")
 	}
-	
+
 	// Verify key sections were printed
 	expectedSections := []string{
 		"Execution Statistics Collection Demo",
-		"Demo Statistics", 
+		"Demo Statistics",
 		"Token Analysis",
 		"GEMINI_API_KEY",
 	}
-	
+
 	for _, section := range expectedSections {
 		if !strings.Contains(output, section) {
 			t.Errorf("Output should contain '%s'", section)
@@ -237,18 +237,18 @@ func BenchmarkStatsGeneration(b *testing.B) {
 			},
 		},
 	}
-	
+
 	// Capture stdout to avoid output during benchmarking
 	old := os.Stdout
 	_, w, _ := os.Pipe()
 	os.Stdout = w
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		printExecutionStats(stats)
 		printTokenAnalysis(stats)
 	}
-	
+
 	// Restore stdout
 	w.Close()
 	os.Stdout = old

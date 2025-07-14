@@ -1,0 +1,13 @@
+Extract basic document information from this document.
+
+Focus on identifying:
+- Document title and type
+- Author/creator information  
+- Date and version information
+- Category or classification
+
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+Return as a JSON object with the exact field names from the Keys list.
+
+Document content: {{ Document }}

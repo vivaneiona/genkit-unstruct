@@ -110,7 +110,7 @@ func main() {
 	// Configure models for different fields
 	modelConfig := map[string]string{
 		"name":    "gpt-4o",
-		"age":     "gpt-4o", 
+		"age":     "gpt-4o",
 		"email":   "gpt-3.5-turbo",
 		"address": "gpt-3.5-turbo",
 	}
@@ -204,7 +204,7 @@ func printTokenAnalysis(stats *unstruct.ExecutionStats) {
 	fmt.Printf("  • Total Input:  %d tokens\n", stats.TotalInputTokens)
 	fmt.Printf("  • Total Output: %d tokens\n", stats.TotalOutputTokens)
 	fmt.Printf("  • Total Usage:  %d tokens\n", stats.TotalInputTokens+stats.TotalOutputTokens)
-	
+
 	if len(stats.GroupDetails) > 0 {
 		fmt.Printf("\n📈 Per-Group Analysis:\n")
 		for i, group := range stats.GroupDetails {
@@ -239,7 +239,7 @@ func demoWithoutAPI(sampleDoc string) {
 			},
 			{
 				PromptName:   "contact-info",
-				Model:        "gpt-3.5-turbo", 
+				Model:        "gpt-3.5-turbo",
 				Fields:       []string{"email", "address"},
 				InputTokens:  130,
 				OutputTokens: 40,
@@ -249,7 +249,7 @@ func demoWithoutAPI(sampleDoc string) {
 
 	printSectionHeader("Demo Statistics")
 	printExecutionStats(stats)
-	
+
 	printSectionHeader("Demo Token Analysis")
 	printTokenAnalysis(stats)
 

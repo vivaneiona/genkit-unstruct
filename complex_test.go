@@ -128,7 +128,6 @@ func TestTagParsing(t *testing.T) {
 	}
 }
 
-
 func TestSingleCallWithParentStructModel(t *testing.T) {
 	// Test that when model is defined at parent struct level,
 	// fields are grouped by parent path but use the same prompt and model
@@ -194,7 +193,7 @@ func TestSingleCallDryRunWithUnstruct(t *testing.T) {
 	}
 
 	// Create Unstruct instance with your exact structure using test invoker
-	unstruct := NewForTesting[UserRequestedStructure](promptProvider)
+	unstruct := newTestingUnstructor[UserRequestedStructure](promptProvider)
 
 	// Call DryRun on the structure with model specified
 	stats, err := unstruct.DryRun(context.Background(), []Asset{
@@ -254,7 +253,7 @@ func TestSingleCallDryRunWithFlattenGroups(t *testing.T) {
 	}
 
 	// Create Unstruct instance with your exact structure using test invoker
-	unstruct := NewForTesting[UserRequestedStructure](promptProvider)
+	unstruct := newTestingUnstructor[UserRequestedStructure](promptProvider)
 
 	// Call DryRun on the structure with model specified AND flattened groups
 	stats, err := unstruct.DryRun(context.Background(), []Asset{

@@ -25,8 +25,8 @@ func (t *testInvoker) Generate(
 	return json.Marshal(mockResponse)
 }
 
-// NewForTesting creates a Unstructor with a test invoker that doesn't require a real client
-func NewForTesting[T any](p PromptProvider) *Unstructor[T] {
+// newTestingUnstructor creates a Unstructor with a test invoker that doesn't require a real client
+func newTestingUnstructor[T any](p PromptProvider) *Unstructor[T] {
 	return &Unstructor[T]{
 		invoker: &testInvoker{},
 		prompts: p,

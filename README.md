@@ -11,28 +11,42 @@ go get github.com/vivaneiona/genkit-unstruct@latest
 
 ## Quick start
 
+#### main.go
+
 ```go
 package main
 
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 
-	"github.com/vivaneiona/genkit-unstruct"
+	unstruct "github.com/vivaneiona/genkit-unstruct"
 	"google.golang.org/genai"
 )
 
 type Person struct {
-	Name string `json:"name"   unstruct:"basic"`
-	Age  int    `json:"age"    unstruct:"basic"`
-	City string `json:"city"   unstruct:"basic"`
+	Name string `json:"name" unstruct:"basic,gemini-2.0-flash"`
+	Age  int    `json:"age"  unstruct:"basic,gemini-2.5-pro"`
+	City string `json:"city" unstruct:"basic,gemini-2.5-pro"`
 }
 
 func main() {
 	ctx := context.Background()
 
-	client, _ := genai.NewClient(ctx) // handle error in real code
+	client, _ := genai.NewClient(ctx, &genai.ClientConfig{
+		Backend: genai.BackendGeminiAPI,
+		APIKey:  os.Getenv("GEMINI_API_KEY"),
+	}) // handle error in real code
 	defer client.Close()
+
+	prompts, err := unstruct.NewStickPromptProvider(
+		unstruct.WithFS(os.DirFS("."), "templates"),
+	)
+	if err != nil {
+		log.Fatal("Failed to create Stick prompt provider:", err)
+	}
 
 	u := unstruct.New[Person](client, prompts)       // prompts is any PromptProvider
 	p, _ := u.UnstructFromText(ctx, "John, 25, NYC") // handle error
@@ -40,6 +54,25 @@ func main() {
 	fmt.Printf("%+v\n", p) // → {Name:John Age:25 City:NYC}
 }
 ```
+
+
+#### templates/basic.twig
+
+```twig
+Extract basic document information from this document.
+
+Focus on identifying:
+- Name
+- City
+- Age
+
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+Return as a JSON object with the exact field names from the Keys list.
+
+Document content: {{ Document }}
+```
+
 
 ### Core ideas
 - Tags drive extraction – every struct field declares its prompt/model in unstruct:"…".
@@ -63,6 +96,7 @@ func (u *Unstructor[T]) DryRun(ctx context.Context, assets []Asset, opts ...Opti
 ```go
 unstruct.NewTextAsset(text)
 unstruct.NewImageAsset(data, mime)
+unstruct.NewFileAsset(client, filePath, opts...)
 unstruct.NewMultiModalAsset(text, media...)
 ```
 

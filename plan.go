@@ -797,21 +797,28 @@ func (pb *PlanBuilder) formatAsHTML(plan *PlanNode) string {
 }
 
 // DefaultModelPricing returns current input/output token costs (USD / 1K tokens).
+// DefaultModelPricing returns current input/output token costs (USD per 1 K tokens).
 func DefaultModelPricing() map[string]ModelPrice {
 	return map[string]ModelPrice{
-		"gpt-4o":        {PromptTokCost: 0.0050, CompletionTokCost: 0.0200}, // $5 / M in, $20 / M out (https://openai.com/api/pricing/)
-		"gpt-4o-mini":   {PromptTokCost: 0.0006, CompletionTokCost: 0.0024}, // $0.60 / M in, $2.40 / M out  (https://openai.com/api/pricing/)
-		"gpt-4.1":       {PromptTokCost: 0.0020, CompletionTokCost: 0.0080}, // $2 / M in,  $8 / M out   (https://openai.com/api/pricing/)
-		"gpt-4.1-mini":  {PromptTokCost: 0.0004, CompletionTokCost: 0.0016}, // $0.40 / M in, $1.60 / M out  (https://openai.com/api/pricing/)
+		// OpenAI
+		"gpt-4o":        {PromptTokCost: 0.0050, CompletionTokCost: 0.0200}, // $5 / M in,  $20 / M out  (OpenAI pricing)
+		"gpt-4o-mini":   {PromptTokCost: 0.0006, CompletionTokCost: 0.0024}, // $0.60 / M in, $2.40 / M out
+		"gpt-4.1":       {PromptTokCost: 0.0020, CompletionTokCost: 0.0080}, // $2 / M in,  $8 / M out
+		"gpt-4.1-mini":  {PromptTokCost: 0.0004, CompletionTokCost: 0.0016}, // $0.40 / M in, $1.60 / M out
+		"gpt-4.1-nano":  {PromptTokCost: 0.0001, CompletionTokCost: 0.0004}, // $0.10 / M in, $0.40 / M out
 		"gpt-3.5-turbo": {PromptTokCost: 0.0005, CompletionTokCost: 0.0015}, // $0.50 / M in, $1.50 / M out
 
-		"gemini-2.5-pro":   {PromptTokCost: 0.00125, CompletionTokCost: 0.0100}, // $1.25 / M in, $10 / M out  (https://cloud.google.com/vertex-ai/generative-ai/pricing)
-		"gemini-2.5-flash": {PromptTokCost: 0.00030, CompletionTokCost: 0.0025}, // $0.30 / M in, $2.50 / M out
-		"gemini-2.0-flash": {PromptTokCost: 0.00015, CompletionTokCost: 0.0006}, // $0.15 / M in, $0.60 / M out
+		// Google Gemini
+		"gemini-2.5-pro":   {PromptTokCost: 0.00125, CompletionTokCost: 0.0100},   // $1.25 / M in, $10 / M out  (Vertex AI pricing)
+		"gemini-2.5-flash": {PromptTokCost: 0.00030, CompletionTokCost: 0.0025},   // $0.30 / M in, $2.50 / M out
+		"gemini-2.0-flash": {PromptTokCost: 0.00015, CompletionTokCost: 0.0006},   // $0.15 / M in, $0.60 / M out
+		"gemini-1.5-pro":   {PromptTokCost: 0.00125, CompletionTokCost: 0.0050},   // $1.25 / M in,  $5 / M out
+		"gemini-1.5-flash": {PromptTokCost: 0.000075, CompletionTokCost: 0.00030}, // $0.075 / M in, $0.30 / M out
 
-		"claude-3-opus":   {PromptTokCost: 0.0150, CompletionTokCost: 0.0750}, // $15 / M in, $75 / M out  [oai_citation:8‡Anthropic](https://docs.anthropic.com/en/docs/about-claude/pricing)
-		"claude-3-sonnet": {PromptTokCost: 0.0030, CompletionTokCost: 0.0150}, // $3 / M in,  $15 / M out  [oai_citation:9‡Anthropic](https://docs.anthropic.com/en/docs/about-claude/pricing)
-		"claude-3-haiku":  {PromptTokCost: 0.0008, CompletionTokCost: 0.0040}, // $0.80 / M in, $4 / M out   [oai_citation:10‡Anthropic](https://docs.anthropic.com/en/docs/about-claude/pricing)
+		// Anthropic Claude 3
+		"claude-3-opus":   {PromptTokCost: 0.0150, CompletionTokCost: 0.0750}, // $15 / M in, $75 / M out  (Anthropic pricing)
+		"claude-3-sonnet": {PromptTokCost: 0.0030, CompletionTokCost: 0.0150}, // $3 / M in,  $15 / M out
+		"claude-3-haiku":  {PromptTokCost: 0.0008, CompletionTokCost: 0.0040}, // $0.80 / M in, $4 / M out
 	}
 }
 

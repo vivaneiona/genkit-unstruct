@@ -1,0 +1,19 @@
+Extract project-related information from this document.
+
+Look for:
+- Project names, codes, or identifiers
+- Project status, timeline, and phases
+- Budget and resource information
+- Project goals and objectives
+
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+Pay attention to:
+- Specific project identifiers or codes
+- Timeline information (start dates, end dates, milestones)
+- Budget amounts and currency
+- Project phases or stages
+
+Return as a JSON object with the exact field names from the Keys list.
+
+Document content: {{ Document }}

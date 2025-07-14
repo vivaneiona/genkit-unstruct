@@ -76,7 +76,7 @@ func TestUnstructor_SchemaReflection(t *testing.T) {
 }
 
 func TestUnstructor_CallPrompt(t *testing.T) {
-	ext := NewForTesting[TestProject](mockPrompts{})
+	ext := newTestingUnstructor[TestProject](mockPrompts{})
 
 	keys := []string{"name", "code"}
 	doc := "Project Alpha with code ABC-123"
@@ -101,7 +101,7 @@ func TestUnstructor_CallPrompt(t *testing.T) {
 }
 
 func TestUnstructor_UnstructAll(t *testing.T) {
-	ext := NewForTesting[TestProject](mockPrompts{})
+	ext := newTestingUnstructor[TestProject](mockPrompts{})
 
 	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
 	assets := []Asset{&TextAsset{Content: doc}}
@@ -163,7 +163,7 @@ func TestSanitizeJSONResponse(t *testing.T) {
 }
 
 func TestUnstructor_RequiredPrompts(t *testing.T) {
-	ext := NewForTesting[ProjectWithMissingPrompts](mockPrompts{})
+	ext := newTestingUnstructor[ProjectWithMissingPrompts](mockPrompts{})
 
 	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
 	assets := []Asset{&TextAsset{Content: doc}}
@@ -192,7 +192,7 @@ func TestUnstructor_RequiredPrompts(t *testing.T) {
 }
 
 func TestUnstructor_WithFallbackPrompt(t *testing.T) {
-	ext := NewForTesting[ProjectWithMissingPrompts](mockPrompts{})
+	ext := newTestingUnstructor[ProjectWithMissingPrompts](mockPrompts{})
 
 	doc := "Project Alpha with code ABC-123. Located at coordinates 40.7128, -74.0060."
 	assets := []Asset{&TextAsset{Content: doc}}
