@@ -58,29 +58,33 @@ func GenerateBytes(ctx context.Context, client *genai.Client, log *slog.Logger, 
 	var contents []*genai.Content
 
 	for _, msg := range cfg.Messages {
-		// For now, concatenate all text parts into a single prompt
-		var textParts []string
-		var hasMedia bool
+		var parts []*genai.Part
 
 		for _, part := range msg.Parts {
+			log.Debug("Processing message part", "type", part.Type, "file_uri", part.FileURI, "mime_type", part.MimeType)
 			switch part.Type {
 			case "text":
-				textParts = append(textParts, part.Text)
+				// Add text part
+				parts = append(parts, genai.NewPartFromText(part.Text))
 			case "image":
-				hasMedia = true
-				// TODO: Implement proper image handling with the genai API
+				// Add image data part using Blob
+				parts = append(parts, genai.NewPartFromBytes(part.Data, part.MimeType))
+			case "file":
+				// Add file part that references uploaded file using NewPartFromFile
+				// This creates the proper file data part that the AI model can process
+				file := genai.File{
+					URI:      part.FileURI,
+					MIMEType: part.MimeType,
+				}
+				genaiPart := genai.NewPartFromFile(file)
+				log.Debug("Created genai file part", "uri", file.URI, "mime_type", file.MIMEType)
+				parts = append(parts, genaiPart)
 			}
 		}
 
-		if len(textParts) > 0 {
-			combinedText := strings.Join(textParts, "\n")
-			content := genai.NewContentFromText(combinedText, genai.RoleUser)
+		if len(parts) > 0 {
+			content := genai.NewContentFromParts(parts, genai.RoleUser)
 			contents = append(contents, content)
-		}
-
-		// Log if we have media that's not being processed
-		if hasMedia {
-			log.Debug("Media parts detected but not fully implemented in genai integration")
 		}
 	}
 

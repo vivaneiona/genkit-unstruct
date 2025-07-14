@@ -61,8 +61,9 @@ func (i *ImageAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*M
 		return nil, errors.New("image data is empty")
 	}
 	part := &Part{
-		Type: "image",
-		Data: i.Data,
+		Type:     "image",
+		Data:     i.Data,
+		MimeType: i.MimeType,
 	}
 	return []*Message{NewUserMessage(part)}, nil
 }
@@ -162,6 +163,14 @@ func (f *FileAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Me
 			return nil, fmt.Errorf("failed to upload file %s: %w", f.Path, err)
 		}
 
+		log.Debug("File uploaded", "uri", file.URI, "name", file.Name, "state", file.State, "mime_type", file.MIMEType)
+
+		// Check if file is ready to use
+		if file.State != "ACTIVE" {
+			log.Warn("File is not in ACTIVE state", "state", file.State, "uri", file.URI)
+			// For now, we'll continue anyway, but this might be the issue
+		}
+
 		// Cache the uploaded file reference
 		f.uploadedFile = file
 
@@ -178,29 +187,40 @@ func (f *FileAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Me
 			f.ProgressCallback(1, 1, f.Path)
 		}
 
-		log.Debug("File uploaded successfully", "uri", file.URI, "name", file.Name)
+		log.Debug("File upload completed", "uri", file.URI, "name", file.Name, "state", file.State)
 	}
 
-	// Create message text
-	var text string
-	if metadata != nil && f.IncludeMetadata {
-		text = fmt.Sprintf(`File uploaded to Gemini Files API: %s
+	// Create message with file part that references the uploaded file
+	var filePart *Part
 
-File Information:
+	// Determine the MIME type for the file part
+	mimeType := f.MimeType
+	if mimeType == "" {
+		mimeType = getMIMETypeFromPath(f.Path)
+	}
+
+	// Create file part that references the uploaded file URI
+	filePart = NewFilePart(file.URI, mimeType)
+
+	log.Debug("Created file part", "uri", file.URI, "mime_type", mimeType, "part_type", filePart.Type)
+
+	// If metadata is included, also add a text part with file information
+	if metadata != nil && f.IncludeMetadata {
+		metadataText := fmt.Sprintf(`File Information:
 - Original Path: %s
 - Size: %d bytes
 - MIME Type: %s
 - Checksum (SHA256): %s
-- Uploaded At: %s
-
-Please analyze the uploaded file content.`,
-			file.URI, metadata.FilePath, metadata.FileSize, metadata.MIMEType,
+- Uploaded At: %s`,
+			metadata.FilePath, metadata.FileSize, metadata.MIMEType,
 			metadata.Checksum, metadata.UploadedAt.Format(time.RFC3339))
-	} else {
-		text = fmt.Sprintf("File uploaded to Gemini Files API: %s\n\nPlease analyze the uploaded file content.", file.URI)
+
+		// Return both file part and metadata text part
+		return []*Message{NewUserMessage(filePart, NewTextPart(metadataText))}, nil
 	}
 
-	return []*Message{NewUserMessage(NewTextPart(text))}, nil
+	// Return just the file part
+	return []*Message{NewUserMessage(filePart)}, nil
 }
 
 // generateFileMetadata creates detailed file metadata

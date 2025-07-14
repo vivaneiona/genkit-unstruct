@@ -8,6 +8,8 @@ Look for:
 
 Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
+IMPORTANT: If multiple people are found, return information for the PRIMARY project lead only.
+
 Focus on:
 - Full names of individuals
 - Professional email addresses
@@ -18,6 +20,9 @@ Focus on:
 IMPORTANT FOR PROJECT LEAD:
 - Look for terms like "Project Lead:", "Team Lead:", "Manager:", "Lead:", etc.
 - Extract the full name that appears after these terms
+- Return a single name string, not an array
+
+Return a single string value for the project lead, not an array of names.
 - For example: "Project Lead: Jane Doe" should extract "Jane Doe"
 - For example: "Team Lead: Michael Chen" should extract "Michael Chen"
 

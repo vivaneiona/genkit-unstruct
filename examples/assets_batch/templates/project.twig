@@ -8,6 +8,8 @@ Look for:
 
 Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
+IMPORTANT: If multiple projects are found, return information for the FIRST or PRIMARY project only.
+
 Pay attention to:
 - Specific project identifiers or codes
 - Timeline information (start dates, end dates, milestones)
@@ -18,6 +20,8 @@ Pay attention to:
 
 IMPORTANT FOR BUDGET: 
 - If you see "$150,000.00 USD", extract budget as 150000 and currency as "USD"
+
+Return a single project object, not an array. Use the exact field names requested.
 - If you see "$220,000.00 USD", extract budget as 220000 and currency as "USD"
 - Remove all commas, dollar signs, and decimal points from budget numbers
 

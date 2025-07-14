@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,11 @@ type ProjectInfo struct {
 func main() {
 	ctx := context.Background()
 
+	// Enable debug logging
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
 	// Check for required environment variable
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
@@ -54,10 +60,10 @@ func main() {
 	}
 
 	// Run batch processing example
-	runBatchExample(ctx, client, prompts)
+	runBatchExample(ctx, client, prompts, logger)
 }
 
-func runBatchExample(ctx context.Context, client *genai.Client, prompts unstruct.PromptProvider) {
+func runBatchExample(ctx context.Context, client *genai.Client, prompts unstruct.PromptProvider, logger *slog.Logger) {
 	// Find markdown files to process
 	files := findMarkdownFiles("docs")
 	if len(files) == 0 {
@@ -68,7 +74,7 @@ func runBatchExample(ctx context.Context, client *genai.Client, prompts unstruct
 
 	// Create batch asset and unstructor
 	batchAsset := unstruct.NewBatchFileAsset(client, files)
-	u := unstruct.New[ProjectInfo](client, prompts)
+	u := unstruct.NewWithLogger[ProjectInfo](client, prompts, logger)
 	assets := []unstruct.Asset{batchAsset}
 
 	// Show execution plan
