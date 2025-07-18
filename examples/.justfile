@@ -12,6 +12,7 @@ mod? assets 'assets/.justfile'
 mod? openai 'openai/.justfile'
 mod? vertexai 'vertexai/.justfile'
 mod? groups 'groups/.justfile'
+mod? explain 'explain/.justfile'
 
 vet:
     #!/usr/bin/env bash
