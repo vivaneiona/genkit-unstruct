@@ -422,7 +422,7 @@ func TestDryRun_ErrorHandling(t *testing.T) {
 	// Test with no unstructor
 	_, err := builder.callDryRun()
 	assert.Error(t, err, "Should error when no unstructor is set")
-	assert.Contains(t, err.Error(), "unstructor or sample document not configured")
+	assert.Contains(t, err.Error(), "unstructor not configured")
 
 	// Test with unstructor that doesn't implement DryRunner
 	builder.WithUnstructor("not a dry runner")
@@ -437,5 +437,5 @@ func TestDryRun_ErrorHandling(t *testing.T) {
 	builder.WithSampleDocument("") // Reset document
 	_, err = builder.callDryRun()
 	assert.Error(t, err, "Should error when no document is provided")
-	assert.Contains(t, err.Error(), "unstructor or sample document not configured")
+	assert.Contains(t, err.Error(), "sample document not configured")
 }
