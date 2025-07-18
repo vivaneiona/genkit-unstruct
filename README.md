@@ -331,11 +331,13 @@ genkit-unstract git:(main) ✗ just do
 
 ```bash
 ➜  genkit-unstract git:(main) ✗ just do assets run
+🚀 Running Enhanced Assets Example
+go run main.go
 Enhanced Assets Example with URL-style Syntax
 Creating Google GenAI client...
 
 === Text Document Example ===
-2025/07/19 03:57:56 INFO Extraction completed successfully type=main.ExtractionRequest
+2025/07/19 04:20:57 INFO Extraction completed successfully type=main.ExtractionRequest
 Organisation: TechCorp Inc. (Type: Annual Report)
 Financials: Revenue $2500000.00, Budget $3000000.00
 Contact: John Smith (john@techcorp.com)
@@ -344,7 +346,33 @@ Projects: 2 found
   Project 2: Project Beta (Planning) - $800000.00
 
 === File Upload Examples ===
+
+--- Processing: meeting-minutes.md ---
+2025/07/19 04:21:03 INFO Extraction completed successfully type=main.ExtractionRequest
+Organisation:  (Type: Meeting Minutes)
+Financials: Revenue $2300000.00, Budget $800000.00
+Contact:  ()
+Projects: 9 found
+  Project 1: Migrate to microservices architecture (Complete) - $800000.00
+  Project 2: Implement new authentication system (Complete) - $800000.00
+  Project 3: Reduce page load times by 30% (Complete) - $800000.00
+  Project 4: Launch mobile application (iOS/Android) (Beta) - $200000.00
+  Project 5: Beta test AI recommendation engine (Beta) - $200000.00
+  Project 6: Integrate with 5 new third-party APIs (In progress) - $200000.00
+  Project 7: Rebrand company visual identity (In progress) - $120000.00
+  Project 8: Launch content marketing campaign (In progress) - $120000.00
+  Project 9: Attend 4 industry conferences (In progress) - $120000.00
+
+--- Processing: product-requirements.md ---
+2025/07/19 04:21:07 INFO Extraction completed successfully type=main.ExtractionRequest
+Organisation: EduTech Solutions Inc. (Type: Product Requirements Document)
+Financials: Revenue $500000.00, Budget $2000000.00
+Contact:  ()
+Projects: 1 found
+  Project 1: SmartLearn Educational Platform (Draft) - $1200000.00
+
 --- Processing: tech-spec.md ---
+2025/07/19 04:21:11 INFO Extraction completed successfully type=main.ExtractionRequest
 Organisation: TechCorp Inc (Type: Technical Specification)
 Financials: Revenue $0.00, Budget $500000.00
 Contact: John Doe (john.doe@company.com)
@@ -353,13 +381,15 @@ Projects: 1 found
 
 === Rich Explain Example ===
 Execution Plan Analysis:
+2025/07/19 04:21:11 INFO Dry run completed prompt_calls=4 total_input_tokens=708 total_output_tokens=245 models_used=2
 Unstructor Execution Plan (estimated costs)
 SchemaAnalysis (cost=24.6, tokens(in=10), fields=[organisation.name organisation.docType organisation.revenue organisation.budget organisation.contact.name organisation.contact.email organisation.contact.phone organisation.projects.name organisation.projects.status organisation.projects.budget])
   ├─ PromptCall "basic" (model=gemini-1.5-flash, cost=4.6, tokens(in=164,out=49), fields=[organisation.name organisation.docType])
   ├─ PromptCall "financial" (model=gemini-1.5-pro, cost=4.7, tokens(in=171,out=54), fields=[organisation.revenue organisation.budget])
   ├─ PromptCall "contact" (model=gemini-1.5-pro, cost=4.8, tokens(in=183,out=71), fields=[organisation.contact.name organisation.contact.email organisation.contact.phone])
   ├─ PromptCall "projects" (model=gemini-1.5-flash, cost=4.9, tokens(in=190,out=71), fields=[organisation.projects.name organisation.projects.status organisation.projects.budget])
-  └─ MergeFragments (cost=1.5, fields=[...])
+  └─ MergeFragments (cost=1.5, fields=[organisation.name organisation.docType organisation.revenue organisation.budget organisation.contact.name organisation.contact.email organisation.contact.phone organisation.projects.name organisation.projects.status organisation.projects.budget])
+
 
 Parameter Details:
 • basic fields (inherited): gemini-1.5-flash (default model)
@@ -367,6 +397,13 @@ Parameter Details:
 • contact fields: gemini-1.5-pro with temperature=0.2, topK=40 (controlled creativity)
 • projects fields: gemini-1.5-flash (fast processing for arrays)
 
+Field Inheritance:
+• organisation.name & organisation.docType inherit from organisation struct tag
+• contact.name, contact.email, contact.phone inherit from contact struct tag
+• Query parameters (temperature=0.2, topK=40) applied to contact extraction
+
+=== Dry Run Example ===
+2025/07/19 04:21:11 INFO Dry run completed prompt_calls=4 total_input_tokens=389 total_output_tokens=245 models_used=2
 Cost Estimation:
 • Prompt calls: 4
 • Input tokens: 389
