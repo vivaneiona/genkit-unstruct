@@ -2,6 +2,9 @@ package unstruct
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestStruct for testing field-specific model overrides
@@ -20,9 +23,7 @@ func TestWithModelFor_FieldSpecificModels(t *testing.T) {
 	WithModelFor("gemini-1.5-pro", TestStruct{}, "Description")(&opts)
 
 	// Verify the field models map was created and populated
-	if opts.FieldModels == nil {
-		t.Fatal("FieldModels map was not created")
-	}
+	require.NotNil(t, opts.FieldModels, "FieldModels map was not created")
 
 	expectedMappings := map[string]string{
 		"TestStruct.Name":        "gemini-1.5-flash",
@@ -30,11 +31,9 @@ func TestWithModelFor_FieldSpecificModels(t *testing.T) {
 	}
 
 	for expectedKey, expectedModel := range expectedMappings {
-		if actualModel, exists := opts.FieldModels[expectedKey]; !exists {
-			t.Errorf("Expected field mapping for %s not found", expectedKey)
-		} else if actualModel != expectedModel {
-			t.Errorf("Expected model %s for field %s, got %s", expectedModel, expectedKey, actualModel)
-		}
+		actualModel, exists := opts.FieldModels[expectedKey]
+		assert.True(t, exists, "Expected field mapping for %s not found", expectedKey)
+		assert.Equal(t, expectedModel, actualModel, "Expected model %s for field %s, got %s", expectedModel, expectedKey, actualModel)
 	}
 }
 
@@ -50,26 +49,18 @@ func TestSchemaOfWithOptions_FieldModelOverrides(t *testing.T) {
 
 	// Generate schema with options
 	sch, err := schemaOfWithOptions[TestStruct](opts)
-	if err != nil {
-		t.Fatalf("schemaOfWithOptions failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Verify that field-specific models are applied correctly
 	for _, fieldSpec := range sch.json2field {
 		switch fieldSpec.jsonKey {
 		case "name":
-			if fieldSpec.model != "gemini-1.5-flash" {
-				t.Errorf("Expected model gemini-1.5-flash for name field, got %s", fieldSpec.model)
-			}
+			assert.Equal(t, "gemini-1.5-flash", fieldSpec.model, "Expected model gemini-1.5-flash for name field, got %s", fieldSpec.model)
 		case "description":
-			if fieldSpec.model != "gemini-2.0-flash-exp" {
-				t.Errorf("Expected model gemini-2.0-flash-exp for description field, got %s", fieldSpec.model)
-			}
+			assert.Equal(t, "gemini-2.0-flash-exp", fieldSpec.model, "Expected model gemini-2.0-flash-exp for description field, got %s", fieldSpec.model)
 		case "details":
 			// This field should use the default model since no override was specified
-			if fieldSpec.model != "" {
-				t.Errorf("Expected empty model for details field (should inherit), got %s", fieldSpec.model)
-			}
+			assert.Empty(t, fieldSpec.model, "Expected empty model for details field (should inherit), got %s", fieldSpec.model)
 		}
 	}
 }
@@ -84,14 +75,10 @@ func TestSchemaOfWithOptions_PromptGrouping(t *testing.T) {
 	}
 
 	sch, err := schemaOfWithOptions[TestStruct](opts)
-	if err != nil {
-		t.Fatalf("schemaOfWithOptions failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// We should have at least 2 groups due to different models
-	if len(sch.group2keys) < 2 {
-		t.Errorf("Expected at least 2 groups due to different models, got %d", len(sch.group2keys))
-	}
+	assert.GreaterOrEqual(t, len(sch.group2keys), 2, "Expected at least 2 groups due to different models, got %d", len(sch.group2keys))
 
 	// Verify that fields with different models are in separate groups
 	var nameGroup, otherGroup *promptKey
@@ -103,12 +90,8 @@ func TestSchemaOfWithOptions_PromptGrouping(t *testing.T) {
 		}
 	}
 
-	if nameGroup == nil {
-		t.Error("Expected a group with gemini-1.5-flash model for name field")
-	}
-	if otherGroup == nil {
-		t.Error("Expected a group with basic prompt for other fields")
-	}
+	assert.NotNil(t, nameGroup, "Expected a group with gemini-1.5-flash model for name field")
+	assert.NotNil(t, otherGroup, "Expected a group with basic prompt for other fields")
 }
 
 func TestWithModelFor_ChainedCalls(t *testing.T) {
@@ -126,14 +109,10 @@ func TestWithModelFor_ChainedCalls(t *testing.T) {
 	}
 
 	for key, expectedModel := range expected {
-		if actualModel, exists := opts.FieldModels[key]; !exists {
-			t.Errorf("Expected field mapping for %s not found", key)
-		} else if actualModel != expectedModel {
-			t.Errorf("Expected model %s for field %s, got %s", expectedModel, key, actualModel)
-		}
+		actualModel, exists := opts.FieldModels[key]
+		assert.True(t, exists, "Expected field mapping for %s not found", key)
+		assert.Equal(t, expectedModel, actualModel, "Expected model %s for field %s, got %s", expectedModel, key, actualModel)
 	}
 
-	if len(opts.FieldModels) != 3 {
-		t.Errorf("Expected 3 field model mappings, got %d", len(opts.FieldModels))
-	}
+	assert.Len(t, opts.FieldModels, 3, "Expected 3 field model mappings, got %d", len(opts.FieldModels))
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewURLStyleSyntax(t *testing.T) {
@@ -65,4 +66,72 @@ func TestNewURLStyleSyntax(t *testing.T) {
 			assert.Equal(t, tc.expectedModel, result.model, "Tag %q: model mismatch", tc.tag)
 		})
 	}
+}
+
+func TestURLParsingWithParameters(t *testing.T) {
+	testCases := []struct {
+		tag               string
+		expectedPrompt    string
+		expectedModel     string
+		expectedParamKeys []string
+	}{
+		{
+			tag:               "model/vertex/gemini-1.5-flash?temperature=0.5&topK=10",
+			expectedPrompt:    "inherited",
+			expectedModel:     "vertex/gemini-1.5-flash",
+			expectedParamKeys: []string{"temperature", "topK"},
+		},
+		{
+			tag:               "prompt/extraction/model/vertex/gemini-1.5-flash?temperature=0",
+			expectedPrompt:    "extraction",
+			expectedModel:     "vertex/gemini-1.5-flash",
+			expectedParamKeys: []string{"temperature"},
+		},
+		{
+			tag:               "model/openai/gpt-4?temperature=0.7&maxTokens=1000",
+			expectedPrompt:    "inherited",
+			expectedModel:     "openai/gpt-4",
+			expectedParamKeys: []string{"temperature", "maxTokens"},
+		},
+		{
+			tag:               "prompt/detailed?temperature=0.3",
+			expectedPrompt:    "detailed",
+			expectedModel:     "",
+			expectedParamKeys: []string{"temperature"},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.tag, func(t *testing.T) {
+			result := parseUnstructTag(test.tag, "inherited")
+
+			assert.Equal(t, test.expectedPrompt, result.prompt, "Expected prompt '%s', got '%s'", test.expectedPrompt, result.prompt)
+			assert.Equal(t, test.expectedModel, result.model, "Expected model '%s', got '%s'", test.expectedModel, result.model)
+
+			for _, key := range test.expectedParamKeys {
+				assert.Contains(t, result.parameters, key, "Expected parameter '%s' to exist", key)
+			}
+		})
+	}
+}
+
+func TestQueryParameterParsing(t *testing.T) {
+	// Test tag with query parameters
+	tag := "model/vertex/gemini-1.5-flash?temperature=0.5&topK=10"
+	result := parseUnstructTag(tag, "inherited")
+
+	// Check basic parsing
+	assert.Equal(t, "inherited", result.prompt, "Expected prompt 'inherited', got '%s'", result.prompt)
+	assert.Equal(t, "vertex/gemini-1.5-flash", result.model, "Expected model 'vertex/gemini-1.5-flash', got '%s'", result.model)
+
+	// Check parameters
+	require.NotNil(t, result.parameters, "Expected parameters map to be initialized")
+
+	temp, exists := result.parameters["temperature"]
+	assert.True(t, exists, "Expected 'temperature' parameter to exist")
+	assert.Equal(t, "0.5", temp, "Expected temperature '0.5', got '%s'", temp)
+
+	topK, exists := result.parameters["topK"]
+	assert.True(t, exists, "Expected 'topK' parameter to exist")
+	assert.Equal(t, "10", topK, "Expected topK '10', got '%s'", topK)
 }

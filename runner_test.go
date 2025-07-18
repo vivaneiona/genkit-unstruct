@@ -7,24 +7,23 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultRunner(t *testing.T) {
 	ctx := context.Background()
 	runner := DefaultRunner(ctx)
 
-	if runner == nil {
-		t.Fatal("DefaultRunner returned nil")
-	}
+	require.NotNil(t, runner, "DefaultRunner returned nil")
 
 	// Verify it implements the Runner interface
 	var _ Runner = runner
 
 	// Verify it's the expected concrete type
 	_, ok := runner.(*errGroupRunner)
-	if !ok {
-		t.Errorf("DefaultRunner should return *errGroupRunner, got %T", runner)
-	}
+	assert.True(t, ok, "DefaultRunner should return *errGroupRunner, got %T", runner)
 }
 
 func TestErrGroupRunner_Go_Success(t *testing.T) {
@@ -46,15 +45,11 @@ func TestErrGroupRunner_Go_Success(t *testing.T) {
 
 	// Wait for all to complete
 	err := runner.Wait()
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+	assert.NoError(t, err, "Expected no error, got %v", err)
 
 	// Ensure all goroutines ran
 	wg.Wait()
-	if atomic.LoadInt32(&counter) != 5 {
-		t.Errorf("Expected counter to be 5, got %d", atomic.LoadInt32(&counter))
-	}
+	assert.Equal(t, int32(5), atomic.LoadInt32(&counter), "Expected counter to be 5, got %d", atomic.LoadInt32(&counter))
 }
 
 func TestErrGroupRunner_Go_WithError(t *testing.T) {
@@ -75,12 +70,8 @@ func TestErrGroupRunner_Go_WithError(t *testing.T) {
 
 	// Wait should return the error
 	err := runner.Wait()
-	if err == nil {
-		t.Error("Expected error, got nil")
-	}
-	if err != expectedErr {
-		t.Errorf("Expected %v, got %v", expectedErr, err)
-	}
+	assert.Error(t, err, "Expected error, got nil")
+	assert.Equal(t, expectedErr, err, "Expected %v, got %v", expectedErr, err)
 }
 
 func TestErrGroupRunner_Go_MultipleErrors(t *testing.T) {
@@ -101,13 +92,9 @@ func TestErrGroupRunner_Go_MultipleErrors(t *testing.T) {
 
 	// Wait should return one of the errors (errgroup returns the first)
 	err := runner.Wait()
-	if err == nil {
-		t.Error("Expected error, got nil")
-	}
+	assert.Error(t, err, "Expected error, got nil")
 	// Could be either error depending on timing
-	if err != err1 && err != err2 {
-		t.Errorf("Expected error1 or error2, got %v", err)
-	}
+	assert.True(t, err == err1 || err == err2, "Expected error1 or error2, got %v", err)
 }
 
 func TestErrGroupRunner_ContextCancellation(t *testing.T) {
@@ -129,9 +116,7 @@ func TestErrGroupRunner_ContextCancellation(t *testing.T) {
 
 	// Wait should return context.Canceled
 	err := runner.Wait()
-	if !errors.Is(err, context.Canceled) {
-		t.Errorf("Expected context.Canceled, got %v", err)
-	}
+	assert.True(t, errors.Is(err, context.Canceled), "Expected context.Canceled, got %v", err)
 }
 
 func TestErrGroupRunner_ContextTimeout(t *testing.T) {
@@ -152,9 +137,7 @@ func TestErrGroupRunner_ContextTimeout(t *testing.T) {
 
 	// Wait should return context.DeadlineExceeded
 	err := runner.Wait()
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("Expected context.DeadlineExceeded, got %v", err)
-	}
+	assert.True(t, errors.Is(err, context.DeadlineExceeded), "Expected context.DeadlineExceeded, got %v", err)
 }
 
 func TestErrGroupRunner_EmptyRunner(t *testing.T) {
@@ -163,9 +146,7 @@ func TestErrGroupRunner_EmptyRunner(t *testing.T) {
 
 	// Call Wait without scheduling any work
 	err := runner.Wait()
-	if err != nil {
-		t.Errorf("Expected no error for empty runner, got %v", err)
-	}
+	assert.NoError(t, err, "Expected no error for empty runner, got %v", err)
 }
 
 func TestErrGroupRunner_ConcurrentAccess(t *testing.T) {
@@ -186,35 +167,21 @@ func TestErrGroupRunner_ConcurrentAccess(t *testing.T) {
 	}
 
 	err := runner.Wait()
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+	assert.NoError(t, err, "Expected no error, got %v", err)
 
-	if atomic.LoadInt32(&counter) != int32(numGoroutines) {
-		t.Errorf("Expected counter to be %d, got %d", numGoroutines, atomic.LoadInt32(&counter))
-	}
+	assert.Equal(t, int32(numGoroutines), atomic.LoadInt32(&counter), "Expected counter to be %d, got %d", numGoroutines, atomic.LoadInt32(&counter))
 }
 
 func TestNewErrGroupRunner(t *testing.T) {
 	ctx := context.Background()
 	runner := newErrGroupRunner(ctx)
 
-	if runner == nil {
-		t.Fatal("newErrGroupRunner returned nil")
-	}
-
-	if runner.ctx == nil {
-		t.Error("runner.ctx should not be nil")
-	}
-
-	if runner.eg == nil {
-		t.Error("runner.eg should not be nil")
-	}
+	require.NotNil(t, runner, "newErrGroupRunner returned nil")
+	require.NotNil(t, runner.ctx, "runner.ctx should not be nil")
+	require.NotNil(t, runner.eg, "runner.eg should not be nil")
 
 	// The context should be derived from the parent
-	if runner.ctx == ctx {
-		t.Error("runner.ctx should be a derived context, not the same as parent")
-	}
+	assert.NotEqual(t, ctx, runner.ctx, "runner.ctx should be a derived context, not the same as parent")
 }
 
 // TestRunnerInterface ensures the interface is properly implemented
@@ -228,9 +195,7 @@ func TestRunnerInterface(t *testing.T) {
 	runner.Go(func() error { return nil })
 	err := runner.Wait()
 
-	if err != nil {
-		t.Errorf("Basic interface test failed: %v", err)
-	}
+	assert.NoError(t, err, "Basic interface test failed: %v", err)
 }
 
 // BenchmarkRunner tests performance characteristics

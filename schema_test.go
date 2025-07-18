@@ -4,6 +4,9 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test structures for schema testing
@@ -99,41 +102,25 @@ type NewSyntaxStruct struct {
 
 func TestSchemaOf_SimpleStruct(t *testing.T) {
 	sch, err := schemaOf[SimpleStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Should have one prompt group
-	if len(sch.group2keys) != 1 {
-		t.Errorf("Expected 1 prompt group, got %d", len(sch.group2keys))
-	}
+	assert.Len(t, sch.group2keys, 1, "Expected 1 prompt group, got %d", len(sch.group2keys))
 
 	// Should have two fields
-	if len(sch.json2field) != 2 {
-		t.Errorf("Expected 2 fields, got %d", len(sch.json2field))
-	}
+	assert.Len(t, sch.json2field, 2, "Expected 2 fields, got %d", len(sch.json2field))
 
 	// Check the basic group
 	basicKey := promptKey{prompt: "basic", parentPath: "", model: ""}
 	keys, exists := sch.group2keys[basicKey]
-	if !exists {
-		t.Error("Expected 'basic' prompt group to exist")
-	}
-	if len(keys) != 2 {
-		t.Errorf("Expected 2 keys in basic group, got %d", len(keys))
-	}
+	assert.True(t, exists, "Expected 'basic' prompt group to exist")
+	assert.Len(t, keys, 2, "Expected 2 keys in basic group, got %d", len(keys))
 
 	// Check field specs
 	nameField, exists := sch.json2field["name"]
-	if !exists {
-		t.Error("Expected 'name' field to exist")
-	}
-	if nameField.jsonKey != "name" {
-		t.Errorf("Expected jsonKey 'name', got %s", nameField.jsonKey)
-	}
-	if len(nameField.index) != 1 {
-		t.Errorf("Expected index length 1, got %d", len(nameField.index))
-	}
+	assert.True(t, exists, "Expected 'name' field to exist")
+	assert.Equal(t, "name", nameField.jsonKey, "Expected jsonKey 'name', got %s", nameField.jsonKey)
+	assert.Len(t, nameField.index, 1, "Expected index length 1, got %d", len(nameField.index))
 }
 
 func TestSchemaOf_NestedStruct(t *testing.T) {
