@@ -13,12 +13,3 @@ mod? openai 'openai/.justfile'
 mod? vertexai 'vertexai/.justfile'
 mod? groups 'groups/.justfile'
 mod? explain 'explain/.justfile'
-
-vet:
-    #!/usr/bin/env bash
-    for dir in */; do
-        if [ -f "$dir/go.mod" ]; then
-            echo "Running go vet in $dir"
-            (cd "$dir" && just vet)
-        fi
-    done
