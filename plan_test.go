@@ -2,6 +2,7 @@ package unstruct
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -490,4 +491,146 @@ func (m *MockUnstructor) DryRun(ctx context.Context, assets []Asset, optFns ...f
 			},
 		},
 	}, nil
+}
+
+func TestParametersAndCostFormatting(t *testing.T) {
+	builder := NewPlanBuilder()
+
+	// Test schema with fields using parameters
+	schema := map[string]interface{}{
+		"fields": []string{"Name", "Age", "Email"},
+	}
+
+	// Test with parameters to verify they are displayed
+	modelConfig := map[string]string{
+		"Name":  "model/gemini-1.5-flash?temperature=0.2&topK=10",
+		"Age":   "model/gemini-2.0-flash?temperature=0.5",
+		"Email": "model/gpt-4o?maxOutputTokens=1000&topP=0.8",
+	}
+
+	builder.WithSchema(schema).WithModelConfig(modelConfig)
+
+	// Get plan with costs
+	pricing := DefaultModelPricing()
+	plan, err := builder.ExplainWithCosts(pricing)
+	require.NoError(t, err)
+
+	// Print parameters and costs for each prompt call
+	t.Logf("=== Execution Plan with Parameters and Costs ===")
+	t.Logf("Total Estimated Cost: $%.4f", plan.EstCost)
+
+	for _, child := range plan.Children {
+		if child.Type == PromptCallType {
+			t.Logf("\n--- PromptCall: %s ---", child.PromptName)
+			t.Logf("Model: %s", child.Model)
+
+			// Print parameters if any (this would need to be added to PlanNode struct)
+			// For now, we can extract from the model string if it contains query params
+			if strings.Contains(child.Model, "?") {
+				parts := strings.Split(child.Model, "?")
+				if len(parts) > 1 {
+					t.Logf("Parameters: %s", parts[1])
+				}
+			}
+
+			t.Logf("Fields: %v", child.Fields)
+			t.Logf("Estimated Cost: $%.6f", child.EstCost)
+
+			if child.ActCost != nil {
+				t.Logf("Actual Cost: $%.6f", *child.ActCost)
+			}
+
+			t.Logf("Input Tokens: %d, Output Tokens: %d", child.InputTokens, child.OutputTokens)
+		}
+	}
+
+	// Verify parameters are preserved in the plan
+	for _, child := range plan.Children {
+		if child.Type == PromptCallType {
+			// Check that the model field contains parameters
+			if child.Fields != nil && len(child.Fields) > 0 {
+				field := child.Fields[0]
+				expectedParam := false
+				switch field {
+				case "Name":
+					expectedParam = strings.Contains(child.Model, "temperature=0.2")
+				case "Age":
+					expectedParam = strings.Contains(child.Model, "temperature=0.5")
+				case "Email":
+					expectedParam = strings.Contains(child.Model, "maxOutputTokens=1000")
+				}
+
+				if !expectedParam {
+					t.Logf("Warning: Expected parameters not found in model for field %s: %s", field, child.Model)
+				}
+			}
+		}
+	}
+
+	// Verify cost formatting
+	assert.Greater(t, plan.EstCost, 0.0, "Total cost should be positive")
+
+	// Print formatted text output
+	textOutput, err := builder.ExplainPrettyWithCosts(FormatText, pricing)
+	require.NoError(t, err)
+
+	t.Logf("\n=== Formatted Text Output ===")
+	t.Logf("%s", textOutput)
+
+	// Verify text output contains cost formatting
+	assert.Contains(t, textOutput, "cost=", "Text output should contain cost information")
+
+	// Verify parameters are displayed in model fields within the formatted output
+	assert.Contains(t, textOutput, "temperature=0.2&topK=10", "Should show temperature and topK parameters")
+	assert.Contains(t, textOutput, "temperature=0.5", "Should show temperature parameter")
+	assert.Contains(t, textOutput, "maxOutputTokens=1000&topP=0.8", "Should show maxOutputTokens and topP parameters")
+}
+
+func TestCostFormattingWithMoney(t *testing.T) {
+	builder := NewPlanBuilder()
+
+	schema := map[string]interface{}{
+		"fields": []string{"CompanyName", "Revenue"},
+	}
+
+	// Use models with different cost structures
+	modelConfig := map[string]string{
+		"CompanyName": "gpt-4o",
+		"Revenue":     "gpt-3.5-turbo",
+	}
+
+	builder.WithSchema(schema).WithModelConfig(modelConfig)
+
+	pricing := DefaultModelPricing()
+
+	// Test both text and JSON formatting with costs
+	textOutput, err := builder.ExplainPrettyWithCosts(FormatText, pricing)
+	require.NoError(t, err)
+
+	jsonOutput, err := builder.ExplainPrettyWithCosts(FormatJSON, pricing)
+	require.NoError(t, err)
+
+	t.Logf("=== Cost Analysis ===")
+
+	// Extract and log costs with money formatting
+	plan, err := builder.ExplainWithCosts(pricing)
+	require.NoError(t, err)
+
+	t.Logf("💰 Total Execution Cost: $%.4f", plan.EstCost)
+
+	for _, child := range plan.Children {
+		if child.Type == PromptCallType {
+			t.Logf("💸 %s (%s): $%.6f", child.PromptName, child.Model, child.EstCost)
+			if child.ActCost != nil {
+				t.Logf("💵 Actual cost: $%.6f", *child.ActCost)
+			}
+		}
+	}
+
+	// Verify both outputs contain cost information
+	assert.Contains(t, textOutput, "$", "Text format should show costs with $ symbol")
+	assert.Contains(t, jsonOutput, "estCost", "JSON format should include cost estimates")
+
+	t.Logf("\n=== Text Format with Costs ===")
+	t.Logf("%s", textOutput)
 }

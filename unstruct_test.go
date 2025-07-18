@@ -88,6 +88,7 @@ func TestUnstructor_CallPrompt(t *testing.T) {
 		keys,
 		assets,
 		"test-model",
+		nil, // no parameters
 		Options{},
 	)
 

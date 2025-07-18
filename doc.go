@@ -147,9 +147,18 @@
 // The unstruct tag supports flexible syntax for controlling extraction:
 //
 //   - unstruct:"prompt" - Use a specific prompt template
-//   - unstruct:"gemini-1.5-pro" - Use a specific model (inherits parent prompt)
-//   - unstruct:"prompt,gemini-1.5-pro" - Use both custom prompt and model
+//   - unstruct:"prompt,gemini-1.5-pro" - Use both custom prompt and model (legacy)
+//   - unstruct:"model/gemini-2.0-flash" - Use default prompt with override model
+//   - unstruct:"prompt/promptname/model/gemini-1.5-pro" - URL-style syntax
 //   - No tag - ERROR: All fields must specify a prompt or use WithFallbackPrompt()
+//
+// The new URL-style syntax supports complex model names and is more flexible:
+//
+//	type Data struct {
+//	    Name   string `unstruct:"prompt/person/model/gemini-1.5-pro"`
+//	    Email  string `unstruct:"model/openai/gpt-4"`  // Inherits prompt from parent
+//	    Legacy string `unstruct:"extraction,gemini-1.5-flash"`  // Legacy comma syntax still works
+//	}
 //
 // # Field Grouping and Batching
 //

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -99,6 +100,63 @@ func GenerateBytes(ctx context.Context, client *genai.Client, log *slog.Logger, 
 	// Create generation config for JSON output
 	config := &genai.GenerateContentConfig{
 		ResponseMIMEType: "application/json",
+	}
+
+	// Apply query parameters from tags if available
+	if cfg.Parameters != nil {
+		if temp, exists := cfg.Parameters["temperature"]; exists {
+			tempFloat, err := strconv.ParseFloat(temp, 32)
+			if err != nil {
+				return nil, fmt.Errorf("invalid temperature parameter '%s': %w", temp, err)
+			}
+			if tempFloat < 0 || tempFloat > 1 {
+				return nil, fmt.Errorf("temperature parameter '%v' must be between 0.0 and 1.0", tempFloat)
+			}
+			val := float32(tempFloat)
+			config.Temperature = &val
+		}
+		if topK, exists := cfg.Parameters["topK"]; exists {
+			topKFloat, err := strconv.ParseFloat(topK, 32)
+			if err != nil {
+				return nil, fmt.Errorf("invalid topK parameter '%s': %w", topK, err)
+			}
+			if topKFloat <= 0 {
+				return nil, fmt.Errorf("topK parameter '%v' must be greater than 0", topKFloat)
+			}
+			val := float32(topKFloat)
+			config.TopK = &val
+		}
+		if topP, exists := cfg.Parameters["topP"]; exists {
+			topPFloat, err := strconv.ParseFloat(topP, 32)
+			if err != nil {
+				return nil, fmt.Errorf("invalid topP parameter '%s': %w", topP, err)
+			}
+			if topPFloat < 0 || topPFloat > 1 {
+				return nil, fmt.Errorf("topP parameter '%v' must be between 0.0 and 1.0", topPFloat)
+			}
+			val := float32(topPFloat)
+			config.TopP = &val
+		}
+		if maxTokens, exists := cfg.Parameters["maxTokens"]; exists {
+			maxTokensInt, err := strconv.Atoi(maxTokens)
+			if err != nil {
+				return nil, fmt.Errorf("invalid maxTokens parameter '%s': %w", maxTokens, err)
+			}
+			if maxTokensInt <= 0 {
+				return nil, fmt.Errorf("maxTokens parameter '%d' must be greater than 0", maxTokensInt)
+			}
+			config.MaxOutputTokens = int32(maxTokensInt)
+		}
+		if maxOutputTokens, exists := cfg.Parameters["maxOutputTokens"]; exists {
+			maxTokensInt, err := strconv.Atoi(maxOutputTokens)
+			if err != nil {
+				return nil, fmt.Errorf("invalid maxOutputTokens parameter '%s': %w", maxOutputTokens, err)
+			}
+			if maxTokensInt <= 0 {
+				return nil, fmt.Errorf("maxOutputTokens parameter '%d' must be greater than 0", maxTokensInt)
+			}
+			config.MaxOutputTokens = int32(maxTokensInt)
+		}
 	}
 
 	// Generate content
@@ -208,6 +266,13 @@ func (x *Unstructor[T]) Unstruct(
 		pk, keys := pk, keys // loop capture
 		r.Go(func() error {
 			model := opts.Model
+			var parameters map[string]string
+
+			// Get parameters from group specs
+			if groupSpec, exists := sch.group2specs[pk]; exists {
+				parameters = groupSpec.parameters
+			}
+
 			// Use model from promptKey if specified, otherwise check individual fields
 			if pk.model != "" {
 				model = pk.model
@@ -215,8 +280,12 @@ func (x *Unstructor[T]) Unstruct(
 				if m := sch.json2field[keys[0]].model; m != "" {
 					model = m
 				}
+				// Also get parameters from individual field if only one field
+				if len(keys) == 1 && parameters == nil {
+					parameters = sch.json2field[keys[0]].parameters
+				}
 			}
-			raw, err := x.callPrompt(egCtx, pk.prompt, keys, assets, model, opts)
+			raw, err := x.callPrompt(egCtx, pk.prompt, keys, assets, model, parameters, opts)
 			if err != nil {
 				return fmt.Errorf("%s: %w", pk.prompt, err)
 			}
@@ -365,6 +434,7 @@ func (x *Unstructor[T]) callPrompt(
 	keys []string,
 	assets []Asset,
 	model string,
+	parameters map[string]string,
 	opts Options,
 ) ([]byte, error) {
 	// label may be empty → check for fallback or error
@@ -436,7 +506,24 @@ func (x *Unstructor[T]) callPrompt(
 	var result []byte
 	err = retryable(func() error {
 		var genErr error
-		result, genErr = x.invoker.Generate(ctx, Model(model), prompt, mediaParts)
+
+		// If we have parameters, use GenerateBytes directly for better control
+		if len(parameters) > 0 {
+			// Build messages for GenerateBytes
+			messages := []*Message{NewUserMessage(
+				append([]*Part{NewTextPart(prompt)}, mediaParts...)...,
+			)}
+
+			result, genErr = GenerateBytes(ctx, x.invoker.(*genkitInvoker).client, x.log,
+				WithModelName(model),
+				WithMessages(messages...),
+				WithParameters(parameters),
+			)
+		} else {
+			// Use the old path for backward compatibility
+			result, genErr = x.invoker.Generate(ctx, Model(model), prompt, mediaParts)
+		}
+
 		if genErr != nil {
 			x.log.Debug("Generate failed", "label", label, "model", model, "error", genErr)
 		}

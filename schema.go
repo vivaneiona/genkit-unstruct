@@ -1,29 +1,62 @@
 package unstruct
 
 import (
+	"crypto/md5"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 )
 
 const unstractTag = "unstruct"
 
+// hashParameters creates a deterministic hash of parameters for grouping
+func hashParameters(params map[string]string) string {
+	if len(params) == 0 {
+		return ""
+	}
+
+	// Sort keys for deterministic hashing
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Create a sorted string representation
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%s", k, params[k]))
+	}
+
+	hashStr := strings.Join(parts, "&")
+	return fmt.Sprintf("%x", md5.Sum([]byte(hashStr)))[:8] // Use first 8 chars of hash
+}
+
 type promptKey struct {
 	prompt     string // explicit label or ""
 	parentPath string // dotted path w/o the leaf field
 	model      string // model name for this group
+	paramsHash string // hash of parameters for grouping
+}
+
+type promptGroup struct {
+	promptKey
+	parameters map[string]string // query parameters for this group
 }
 
 type fieldSpec struct {
-	jsonKey string
-	model   string // may be ""
-	index   []int  // reflect path
+	jsonKey    string
+	model      string            // may be ""
+	parameters map[string]string // query parameters for this field
+	index      []int             // reflect path
 }
 
 type schema struct {
-	group2keys map[promptKey][]string // batching groups
-	json2field map[string]fieldSpec   // merge map
+	group2keys  map[promptKey][]string    // batching groups (using comparable key)
+	group2specs map[promptKey]promptGroup // stores the full group info with parameters
+	json2field  map[string]fieldSpec      // merge map
 }
 
 func schemaOf[T any]() (*schema, error) {
@@ -38,8 +71,9 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 	}
 
 	s := &schema{
-		group2keys: map[promptKey][]string{},
-		json2field: map[string]fieldSpec{},
+		group2keys:  map[promptKey][]string{},
+		group2specs: map[promptKey]promptGroup{},
+		json2field:  map[string]fieldSpec{},
 	}
 
 	var walk func(t reflect.Type, parent, inheritedPrompt, inheritedModel string, idx []int)
@@ -62,12 +96,14 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 			// Resolve group references
 			prompt := tp.prompt
 			model := tp.model
+			parameters := tp.parameters
 			if strings.HasPrefix(tp.prompt, "group:") {
 				groupName := strings.TrimPrefix(tp.prompt, "group:")
 				if opts != nil && opts.Groups != nil {
 					if groupDef, exists := opts.Groups[groupName]; exists {
 						prompt = groupDef.Prompt
 						model = groupDef.Model
+						// Group parameters could be merged here if needed
 					}
 				}
 			}
@@ -90,9 +126,10 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 			if isPureStruct(f.Type) {
 				// Make the intermediate node addressable during patching
 				s.json2field[fullKey] = fieldSpec{
-					jsonKey: fullKey,
-					model:   model,
-					index:   nextIdx,
+					jsonKey:    fullKey,
+					model:      model,
+					parameters: parameters,
+					index:      nextIdx,
 				}
 				walk(f.Type, fullKey, prompt, model, nextIdx)
 				continue
@@ -101,9 +138,10 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 			// Handle slices of structs
 			if f.Type.Kind() == reflect.Slice && isPureStruct(f.Type.Elem()) {
 				s.json2field[fullKey] = fieldSpec{
-					jsonKey: fullKey,
-					model:   model,
-					index:   nextIdx,
+					jsonKey:    fullKey,
+					model:      model,
+					parameters: parameters,
+					index:      nextIdx,
 				}
 				walk(f.Type.Elem(), fullKey, prompt, model, nextIdx)
 				continue
@@ -115,10 +153,22 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 				parentPathForGrouping = ""
 			}
 
-			pk := promptKey{prompt: prompt, parentPath: parentPathForGrouping, model: model}
+			pk := promptKey{
+				prompt:     prompt,
+				parentPath: parentPathForGrouping,
+				model:      model,
+				paramsHash: hashParameters(parameters),
+			}
 			s.group2keys[pk] = append(s.group2keys[pk], fullKey)
+			s.group2specs[pk] = promptGroup{
+				promptKey:  pk,
+				parameters: parameters,
+			}
 			s.json2field[fullKey] = fieldSpec{
-				jsonKey: fullKey, model: model, index: nextIdx,
+				jsonKey:    fullKey,
+				model:      model,
+				parameters: parameters,
+				index:      nextIdx,
 			}
 		}
 	}

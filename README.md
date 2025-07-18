@@ -130,11 +130,30 @@ type Customer struct {
 ### Tag syntax
 
 ```go
-unstruct:"prompt"                    // Use prompt with default model
-unstruct:"prompt,gemini-1.5-pro"     // Custom prompt with specific model  
-unstruct:"gemini-2.0-flash"          // Use default prompt with override model
-unstruct:"group/team-info"           // Use named group (configured via WithGroup)
+unstruct:"prompt"                                // Use prompt with default model
+unstruct:"prompt,gemini-1.5-pro"                 // Custom prompt with specific model (legacy)
+unstruct:"model/gemini-2.0-flash"                // Use default prompt with override model
+unstruct:"prompt/promptname/model/gemini-1.5-pro" // URL-style syntax  
+unstruct:"group/team-info"                       // Use named group (configured via WithGroup)
 ```
+
+#### Query Parameters
+
+URL-style tags support query parameters for model configuration:
+
+```go
+unstruct:"model/gemini-1.5-flash?temperature=0.2"                    // Set temperature
+unstruct:"model/gemini-2.0-flash?temperature=0.5&topK=10"            // Multiple parameters
+unstruct:"prompt/extract/model/gemini-1.5-pro?topP=0.8&maxOutputTokens=1000" // Full syntax
+```
+
+**Supported parameters:**
+- `temperature` (float 0.0-2.0): Controls randomness in output
+- `topK` (integer): Limits token selection to top-K candidates  
+- `topP` (float 0.0-1.0): Nucleus sampling threshold
+- `maxOutputTokens` (integer): Maximum tokens in response
+
+Parameters are validated and will return errors for invalid values.
 
 ### Multi-modal assets
 
