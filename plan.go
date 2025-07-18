@@ -86,6 +86,8 @@ package unstruct
 import (
 	"context"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 )
 
@@ -111,16 +113,7 @@ const (
 	DefaultNodeCost        = 1.0  // Default cost for unknown types
 )
 
-// Gemini model pricing (per 1M tokens)
-const (
-	GeminiFlashInputCost  = 0.075 // $0.075 per 1M input tokens (Gemini 1.5 Flash)
-	GeminiFlashOutputCost = 0.30  // $0.30 per 1M output tokens (Gemini 1.5 Flash)
-	GeminiProInputCost    = 1.25  // $1.25 per 1M input tokens (Gemini 1.5 Pro)
-	GeminiProOutputCost   = 5.00  // $5.00 per 1M output tokens (Gemini 1.5 Pro)
-)
-
-// DefaultModelPricing returns current input/output token costs (USD / 1K tokens).
-// DefaultModelPricing returns current input/output token costs (USD per 1 K tokens).
+// DefaultModelPricing returns current input/output token costs (USD per 1 000 tokens).
 func DefaultModelPricing() map[string]ModelPrice {
 	return map[string]ModelPrice{
 		// OpenAI
@@ -312,13 +305,23 @@ func (pb *PlanBuilder) WithSchema(schema interface{}) *PlanBuilder {
 
 // WithPromptConfig sets the prompt configuration.
 func (pb *PlanBuilder) WithPromptConfig(config map[string]interface{}) *PlanBuilder {
-	pb.promptConfig = config
+	// Clone the map to avoid shared mutable state
+	cloned := make(map[string]interface{}, len(config))
+	for k, v := range config {
+		cloned[k] = v
+	}
+	pb.promptConfig = cloned
 	return pb
 }
 
 // WithModelConfig sets the model configuration.
 func (pb *PlanBuilder) WithModelConfig(config map[string]string) *PlanBuilder {
-	pb.modelConfig = config
+	// Clone the map to avoid shared mutable state
+	cloned := make(map[string]string, len(config))
+	for k, v := range config {
+		cloned[k] = v
+	}
+	pb.modelConfig = cloned
 	return pb
 }
 
@@ -359,10 +362,11 @@ func (pb *PlanBuilder) buildPlan(options ExplainOptions) (*PlanNode, error) {
 
 	// Prefer dry-run execution if available, otherwise use static analysis
 	if pb.canPerformDryRun() {
-		if plan, err := pb.buildPlanFromDryRun(options); err == nil {
+		plan, err := pb.buildPlanFromDryRun(options)
+		if err == nil {
 			return plan, nil
 		}
-		// Log error but continue with static analysis
+		return nil, fmt.Errorf("dry-run failed: %w", err)
 	}
 
 	return pb.buildPlanFromStaticAnalysis(options)
@@ -676,6 +680,7 @@ func (pb *PlanBuilder) populateSummaryInfo(rootNode *PlanNode) {
 	for model := range models {
 		expectedModels = append(expectedModels, model)
 	}
+	sort.Strings(expectedModels)
 
 	// Only populate summary info on root node
 	rootNode.ExpectedModels = expectedModels
@@ -710,8 +715,10 @@ func (pb *PlanBuilder) calculateActualCost(node *PlanNode, pricing map[string]Mo
 	}
 
 	outputTokens := node.OutputTokens
-	if outputTokens == 0 && len(node.Fields) > 0 {
-		outputTokens = pb.estimateOutputTokens(node.Fields[0])
+	if outputTokens == 0 {
+		for _, f := range node.Fields {
+			outputTokens += pb.estimateOutputTokens(f)
+		}
 	}
 
 	return calculateTokenCost(node.InputTokens, outputTokens, price)
@@ -760,6 +767,5 @@ func EstimateTokensFromText(text string) int {
 
 // EstimateTokensFromWords provides a rough token estimate from word count using constants.
 func EstimateTokensFromWords(wordCount int) int {
-	ratio := int(TokensPerWordRatio * 10) // Convert 1.3 to 13 for integer math
-	return (wordCount*ratio + 9) / 10
+	return int(math.Ceil(float64(wordCount) * TokensPerWordRatio))
 }

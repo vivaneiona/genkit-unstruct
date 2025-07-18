@@ -822,9 +822,9 @@ func TestNestedStructFieldMappingFix(t *testing.T) {
 		intermediateFields := []string{"Project", "Meta"}
 		for _, field := range intermediateFields {
 			if _, exists := sch.json2field[field]; !exists {
-				t.Errorf("❌ STILL BROKEN: Intermediate field %s missing from schema", field)
+				t.Errorf("Intermediate field %s missing from schema", field)
 			} else {
-				t.Logf("✅ FIXED: Intermediate field %s now exists in schema", field)
+				t.Logf("Intermediate field %s now exists in schema", field)
 			}
 		}
 
@@ -861,15 +861,15 @@ func TestNestedStructFieldMappingFix(t *testing.T) {
 
 		// Check if nested fields are populated (should be fixed now)
 		if result.Project.ProjectCode != "TEST-001" {
-			t.Errorf("❌ STILL BROKEN: Expected Project.ProjectCode 'TEST-001', got '%s'", result.Project.ProjectCode)
+			t.Errorf("Expected Project.ProjectCode 'TEST-001', got '%s'", result.Project.ProjectCode)
 		} else {
-			t.Logf("✅ FIXED: Project.ProjectCode correctly set to '%s'", result.Project.ProjectCode)
+			t.Logf("Project.ProjectCode correctly set to '%s'", result.Project.ProjectCode)
 		}
 
 		if result.Meta.ParserVersion != "1.0.0" {
-			t.Errorf("❌ STILL BROKEN: Expected Meta.ParserVersion '1.0.0', got '%s'", result.Meta.ParserVersion)
+			t.Errorf("Expected Meta.ParserVersion '1.0.0', got '%s'", result.Meta.ParserVersion)
 		} else {
-			t.Logf("✅ FIXED: Meta.ParserVersion correctly set to '%s'", result.Meta.ParserVersion)
+			t.Logf("Meta.ParserVersion correctly set to '%s'", result.Meta.ParserVersion)
 		}
 
 		t.Logf("Final Result: %+v", result)
