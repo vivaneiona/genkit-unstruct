@@ -411,3 +411,69 @@ Cost Estimation:
 • Output tokens: 245
 • Models used: map[gemini-1.5-flash:2 gemini-1.5-pro:2]
 ```
+
+```bash
+➜  genkit-unstract git:(main) ✗ just do openai_and_gemini run
+go run main.go
+Multi-Model Extraction Example
+==============================
+Demonstrating different Gemini models with varied parameters
+Note: For OpenAI integration, see the openai example
+
+Creating Google GenAI client...
+
+=== Multi-Model Company Analysis ===
+2025/07/19 05:20:39 Error extracting company data: merge "financial": financials: json: cannot unmarshal string into Go struct field .growth_rate of type float64
+
+=== Model Selection Strategy ===
+2025/07/19 05:20:39 INFO Dry run completed prompt_calls=9 total_input_tokens=1093 total_output_tokens=774 models_used=3
+Model Distribution and Execution Plan:
+Unstructor Execution Plan (estimated costs)
+SchemaAnalysis (cost=50.6, tokens(in=10), fields=[technology.security.compliance technology.security.encryption contact.ceo.name contact.ceo.email contact.investor_relations.name contact.investor_relations.email contact.investor_relations.phone contact.press.name contact.press.email competitive.market_share competitive.competitive_rank competitive.key_differentiators competitive.market_trends financials.revenue financials.profit financials.market_cap financials.growth_rate financials.risk_score financials.outlook technology.primary_tech technology.cloud_provider technology.architecture strategy.market_position strategy.competitors strategy.strengths strategy.threats strategy.opportunities strategy.strategic_priority company.name company.industry company.founded company.headquarters])
+  ├─ PromptCall "technical" (model=gemini-1.5-pro, cost=4.2, tokens(in=117,out=54), fields=[technology.security.compliance technology.security.encryption])
+  ├─ PromptCall "contact" (model=gemini-1.5-pro, cost=4.1, tokens(in=109,out=49), fields=[contact.ceo.name contact.ceo.email])
+  ├─ PromptCall "contact" (model=gemini-1.5-pro, cost=4.2, tokens(in=125,out=71), fields=[contact.investor_relations.name contact.investor_relations.email contact.investor_relations.phone])
+  ├─ PromptCall "contact" (model=gemini-1.5-pro, cost=4.1, tokens(in=110,out=49), fields=[contact.press.name contact.press.email])
+  ├─ PromptCall "competitive" (model=gemini-2.0-flash-exp, cost=4.2, tokens(in=117,out=98), fields=[competitive.market_share competitive.competitive_rank competitive.key_differentiators competitive.market_trends])
+  ├─ PromptCall "financial" (model=gemini-1.5-pro, cost=4.4, tokens(in=142,out=142), fields=[financials.revenue financials.profit financials.market_cap financials.growth_rate financials.risk_score financials.outlook])
+  ├─ PromptCall "technical" (model=gemini-1.5-pro, cost=4.2, tokens(in=120,out=76), fields=[technology.primary_tech technology.cloud_provider technology.architecture])
+  ├─ PromptCall "strategy" (model=gemini-1.5-pro, cost=4.4, tokens(in=141,out=142), fields=[strategy.market_position strategy.competitors strategy.strengths strategy.threats strategy.opportunities strategy.strategic_priority])
+  ├─ PromptCall "basic" (model=gemini-1.5-flash, cost=4.1, tokens(in=112,out=93), fields=[company.name company.industry company.founded company.headquarters])
+  └─ MergeFragments (cost=3.7, fields=[technology.security.compliance technology.security.encryption contact.ceo.name contact.ceo.email contact.investor_relations.name contact.investor_relations.email contact.investor_relations.phone contact.press.name contact.press.email competitive.market_share competitive.competitive_rank competitive.key_differentiators competitive.market_trends financials.revenue financials.profit financials.market_cap financials.growth_rate financials.risk_score financials.outlook technology.primary_tech technology.cloud_provider technology.architecture strategy.market_position strategy.competitors strategy.strengths strategy.threats strategy.opportunities strategy.strategic_priority company.name company.industry company.founded company.headquarters])
+
+
+Model Selection Strategy:
+� Gemini Flash      → Basic facts (optimize for speed & cost)
+� Gemini Pro (T=0.1) → Financial data (optimize for precision)
+� Gemini Pro        → Technical analysis (domain knowledge)
+🎨 Gemini Pro (T=0.3) → Strategic insights (creative reasoning)
+� Gemini Pro (T=0.1) → Contact extraction (maximize accuracy)
+🧠 Gemini 2.0 Flash  → Competitive analysis (advanced reasoning)
+
+Parameter Tuning:
+• Temperature 0.1: High precision for financial/contact data
+• Temperature 0.3: Balanced creativity for strategic analysis
+• TopK=5: Focused selection for contact accuracy
+• TopK=40: Broader selection for strategic creativity
+
+=== Performance and Cost Analysis ===
+2025/07/19 05:20:39 INFO Dry run completed prompt_calls=9 total_input_tokens=1055 total_output_tokens=774 models_used=3
+Performance Analysis:
+• Total API calls: 9
+• Input tokens: 1055
+• Output tokens: 774
+• Models used: map[gemini-1.5-flash:1 gemini-1.5-pro:7 gemini-2.0-flash-exp:1]
+
+Optimization Strategy:
+• Use Flash models for simple extraction tasks
+• Reserve Pro models for complex analysis
+• Tune temperature based on task requirements
+• Group related fields to minimize API calls
+• Consider using experimental models for cutting-edge features
+
+Future Integration:
+• OpenAI models could be integrated for specific reasoning tasks
+• Claude models for creative writing and analysis
+• Anthropic models for ethical reasoning and safety
+• Mixed provider strategy for cost and capability optimization
+```
