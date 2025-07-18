@@ -16,16 +16,16 @@ import (
 
 // ProjectInfo represents project information extracted from documents
 type ProjectInfo struct {
-	ProjectCode string  `json:"projectCode" unstruct:"project"`
-	ProjectName string  `json:"projectName" unstruct:"project"`
-	Budget      float64 `json:"budget" unstruct:"project"`
-	Currency    string  `json:"currency" unstruct:"project"`
-	StartDate   string  `json:"startDate" unstruct:"project"`
-	EndDate     string  `json:"endDate" unstruct:"project"`
-	Status      string  `json:"status" unstruct:"project"`
-	Priority    string  `json:"priority" unstruct:"project"`
-	ProjectLead string  `json:"projectLead" unstruct:"person"`
-	TeamSize    int     `json:"teamSize" unstruct:"project"`
+	ProjectCode string `json:"projectCode" unstruct:"prompt/project/model/gemini-1.5-flash"`
+	ProjectName string `json:"projectName" unstruct:"prompt/project/model/gemini-1.5-flash"`
+	Budget      string `json:"budget" unstruct:"prompt/financial/model/gemini-1.5-pro?temperature=0.1&topK=20"`
+	Currency    string `json:"currency" unstruct:"prompt/financial/model/gemini-1.5-pro?temperature=0.1&topK=20"`
+	StartDate   string `json:"startDate" unstruct:"prompt/timeline/model/gemini-1.5-flash"`
+	EndDate     string `json:"endDate" unstruct:"prompt/timeline/model/gemini-1.5-flash"`
+	Status      string `json:"status" unstruct:"prompt/project/model/gemini-1.5-flash"`
+	Priority    string `json:"priority" unstruct:"prompt/project/model/gemini-1.5-flash"`
+	ProjectLead string `json:"projectLead" unstruct:"prompt/person/model/gemini-1.5-pro?temperature=0.2&topK=40"`
+	TeamSize    int    `json:"teamSize" unstruct:"prompt/project/model/gemini-1.5-flash"`
 }
 
 func main() {
@@ -51,12 +51,12 @@ func main() {
 		log.Fatal("Failed to create client:", err)
 	}
 
-	// Create prompt provider
-	prompts, err := unstruct.NewStickPromptProvider(
-		unstruct.WithFS(os.DirFS("."), "templates"),
-	)
-	if err != nil {
-		log.Fatal("Failed to create prompt provider:", err)
+	// Create prompt provider with improved prompts for different field types
+	prompts := unstruct.SimplePromptProvider{
+		"project":   "Extract project information from the document. Return JSON with fields: {{.Keys}}. For example: {\"projectCode\": \"PROJ-123\", \"projectName\": \"Example Project\", \"status\": \"Active\", \"priority\": \"High\", \"teamSize\": 5}. Document: {{.Document}}",
+		"financial": "Extract financial data from the document. Return JSON with budget as a string number and currency. For example: {\"budget\": \"150000.00\", \"currency\": \"USD\"}. Fields: {{.Keys}}. Document: {{.Document}}",
+		"timeline":  "Extract timeline/date information from the document. Return JSON with date strings. For example: {\"startDate\": \"January 1, 2024\", \"endDate\": \"December 31, 2024\"}. Fields: {{.Keys}}. Document: {{.Document}}",
+		"person":    "Extract person/contact information from the document. Return JSON with name strings. For example: {\"projectLead\": \"John Smith\"}. Fields: {{.Keys}}. Document: {{.Document}}",
 	}
 
 	// Run batch processing example

@@ -6,33 +6,39 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	unstruct "github.com/vivaneiona/genkit-unstruct"
 	"google.golang.org/genai"
 )
 
-// DocumentMetadata represents basic document information
-type DocumentMetadata struct {
-	Title       string `json:"title" unstruct:"basic"`
-	Description string `json:"description" unstruct:"basic"`
-	Category    string `json:"category" unstruct:"basic"`
-	Author      string `json:"author" unstruct:"person"`
-	Date        string `json:"date" unstruct:"basic"`
-	Version     string `json:"version" unstruct:"basic"`
+// Business document structure with model selection per field type
+type ExtractionRequest struct {
+	Organisation struct {
+		// Basic information - uses fast model
+		Name         string `json:"name"`    // inherited from struct tag
+		DocumentType string `json:"docType"` // inherited from struct tag
+
+		// Financial data - uses precise model
+		Revenue float64 `json:"revenue" unstruct:"prompt/financial/model/gemini-1.5-pro"`
+		Budget  float64 `json:"budget" unstruct:"prompt/financial/model/gemini-1.5-pro"`
+
+		// Complex nested data - uses most capable model with parameters
+		Contact struct {
+			Name  string `json:"name"`  // Inherits prompt/contact/model/gemini-1.5-pro?temperature=0.2&topK=40
+			Email string `json:"email"` // Inherits prompt/contact/model/gemini-1.5-pro?temperature=0.2&topK=40
+			Phone string `json:"phone"` // Inherits prompt/contact/model/gemini-1.5-pro?temperature=0.2&topK=40
+		} `json:"contact" unstruct:"prompt/contact/model/gemini-1.5-pro?temperature=0.2&topK=40"` // Query parameters example
+
+		// Array extraction with different model
+		Projects []Project `json:"projects" unstruct:"prompt/projects/model/gemini-1.5-flash"`
+	} `json:"organisation" unstruct:"prompt/basic/model/gemini-1.5-flash"` // Inherited by nested fields
 }
 
-// ProjectInfo represents project-specific information extracted from documents
-type ProjectInfo struct {
-	ProjectCode string  `json:"projectCode" unstruct:"project"`
-	ProjectName string  `json:"projectName" unstruct:"project"`
-	Budget      float64 `json:"budget" unstruct:"project"`
-	Currency    string  `json:"currency" unstruct:"project"`
-	StartDate   string  `json:"startDate" unstruct:"project"`
-	EndDate     string  `json:"endDate" unstruct:"project"`
-	Status      string  `json:"status" unstruct:"project"`
-	Priority    string  `json:"priority" unstruct:"project"`
-	ProjectLead string  `json:"projectLead" unstruct:"person"`
-	TeamSize    int     `json:"teamSize" unstruct:"project"`
+type Project struct {
+	Name   string  `json:"name"`
+	Status string  `json:"status"`
+	Budget float64 `json:"budget"`
 }
 
 func main() {
@@ -41,10 +47,14 @@ func main() {
 	// Check for required environment variable
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
-		log.Fatal("GEMINI_API_KEY environment variable is required")
+		fmt.Println("Error: GEMINI_API_KEY environment variable is required")
+		fmt.Println("Please set it with your Google AI API key:")
+		fmt.Println("export GEMINI_API_KEY=your_api_key_here")
+		os.Exit(1)
 	}
 
-	// Create Google GenAI client
+	// Setup client
+	fmt.Println("Enhanced Assets Example with URL-style Syntax")
 	fmt.Println("Creating Google GenAI client...")
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Backend: genai.BackendGeminiAPI,
@@ -54,66 +64,80 @@ func main() {
 		log.Fatal("Failed to create client:", err)
 	}
 
-	// Create Stick-based prompt provider from template files
-	fmt.Println("Setting up Stick template engine...")
-	promptProvider, err := unstruct.NewStickPromptProvider(
-		unstruct.WithFS(os.DirFS("."), "templates"),
-	)
-	if err != nil {
-		log.Fatal("Failed to create Stick prompt provider:", err)
+	// Prompt templates with improved instructions for nested JSON structure
+	prompts := unstruct.SimplePromptProvider{
+		"basic":     "Extract basic company information from the document. Return JSON with this exact structure: {\"organisation\": {\"name\": \"company_name\", \"docType\": \"document_type\"}}. Fields: {{.Keys}}. Document: {{.Document}}",
+		"financial": "Extract financial data from the document. Return JSON with this exact structure: {\"organisation\": {\"revenue\": 123456, \"budget\": 789012}}. Use only numeric values without currency symbols. Fields: {{.Keys}}. Document: {{.Document}}",
+		"contact":   "Extract contact information from the document. Return JSON with this exact structure: {\"organisation\": {\"contact\": {\"name\": \"contact_name\", \"email\": \"email@domain.com\", \"phone\": \"+1-555-0123\"}}}. Fields: {{.Keys}}. Document: {{.Document}}",
+		"projects":  "Extract project information from the document. Return JSON with this exact structure: {\"organisation\": {\"projects\": [{\"name\": \"project_name\", \"status\": \"status\", \"budget\": 123456}]}}. Use only numeric values for budget. Fields: {{.Keys}}. Document: {{.Document}}",
 	}
 
-	// Example 1: Text-only document extraction
+	// Create extractor
+	extractor := unstruct.New[ExtractionRequest](client, prompts)
+
+	// Example 1: Text document extraction
 	fmt.Println("\n=== Text Document Example ===")
-	runTextExample(ctx, client, promptProvider)
+	runTextExample(ctx, extractor)
 
-	// Example 2: File upload and extraction from markdown files
+	// Example 2: File upload examples
 	fmt.Println("\n=== File Upload Examples ===")
-	runFileUploadExamples(ctx, client, promptProvider)
+	runFileUploadExamples(ctx, client, extractor)
 
-	// Example 3: Dry run for cost estimation
+	// Example 3: Rich explain with parameters
+	fmt.Println("\n=== Rich Explain Example ===")
+	runExplainExample(ctx, extractor)
+
+	// Example 4: Dry run for cost estimation
 	fmt.Println("\n=== Dry Run Example ===")
-	runDryRunExample(ctx, client, promptProvider)
+	runDryRunExample(ctx, extractor)
 }
 
-func runTextExample(ctx context.Context, client *genai.Client, promptProvider unstruct.PromptProvider) {
-	// Create unstructor for basic document metadata
-	u := unstruct.New[DocumentMetadata](client, promptProvider)
-
-	textDoc := `Technical Report: Advanced AI Systems
+func runTextExample(ctx context.Context, extractor *unstruct.Unstructor[ExtractionRequest]) {
+	textDoc := `TechCorp Inc. Annual Report 2024
 	
-	This document describes the implementation of machine learning algorithms for natural language processing.
-	The report was authored by Dr. Sarah Johnson on January 15, 2024.
-	Document version: 1.2
-	Category: Technology Research`
+	Company: TechCorp Inc.
+	Document Type: Annual Report
+	Revenue: $2,500,000
+	Budget: $3,000,000
+	
+	Contact Information:
+	Name: John Smith
+	Email: john@techcorp.com
+	Phone: +1-555-0123
+	
+	Projects:
+	1. Project Alpha - Status: Active - Budget: $500,000
+	2. Project Beta - Status: Planning - Budget: $800,000`
 
-	textAsset := unstruct.NewTextAsset(textDoc)
-	assets := []unstruct.Asset{textAsset}
+	assets := []unstruct.Asset{
+		unstruct.NewTextAsset(textDoc),
+	}
 
-	result, err := u.Unstruct(ctx, assets, unstruct.WithModel("gemini-1.5-flash"))
+	result, err := extractor.Unstruct(ctx, assets,
+		unstruct.WithModel("gemini-1.5-flash"),
+		unstruct.WithTimeout(30*time.Second),
+	)
 	if err != nil {
 		log.Printf("Error extracting from text: %v", err)
 		return
 	}
 
-	fmt.Printf("Title: %s\n", result.Title)
-	fmt.Printf("Description: %s\n", result.Description)
-	fmt.Printf("Category: %s\n", result.Category)
-	fmt.Printf("Author: %s\n", result.Author)
-	fmt.Printf("Date: %s\n", result.Date)
-	fmt.Printf("Version: %s\n", result.Version)
+	fmt.Printf("Organisation: %s (Type: %s)\n", result.Organisation.Name, result.Organisation.DocumentType)
+	fmt.Printf("Financials: Revenue $%.2f, Budget $%.2f\n", result.Organisation.Revenue, result.Organisation.Budget)
+	fmt.Printf("Contact: %s (%s)\n", result.Organisation.Contact.Name, result.Organisation.Contact.Email)
+	fmt.Printf("Projects: %d found\n", len(result.Organisation.Projects))
+	for i, proj := range result.Organisation.Projects {
+		fmt.Printf("  Project %d: %s (%s) - $%.2f\n", i+1, proj.Name, proj.Status, proj.Budget)
+	}
 }
 
-func runFileUploadExamples(ctx context.Context, client *genai.Client, promptProvider unstruct.PromptProvider) {
+func runFileUploadExamples(ctx context.Context, client *genai.Client, extractor *unstruct.Unstructor[ExtractionRequest]) {
 	// Find markdown files in the docs directory
 	markdownFiles := findMarkdownFiles("docs")
 	if len(markdownFiles) == 0 {
 		fmt.Println("No markdown files found in docs/ directory")
 		return
 	}
-
-	// Create unstructor for project information
-	u := unstruct.New[ProjectInfo](client, promptProvider)
 
 	for _, filePath := range markdownFiles {
 		fmt.Printf("\n--- Processing: %s ---\n", filepath.Base(filePath))
@@ -127,10 +151,11 @@ func runFileUploadExamples(ctx context.Context, client *genai.Client, promptProv
 
 		assets := []unstruct.Asset{fileAsset}
 
-		result, err := u.Unstruct(
+		result, err := extractor.Unstruct(
 			ctx,
 			assets,
 			unstruct.WithModel("gemini-1.5-pro"), // Use Pro model for file analysis
+			unstruct.WithTimeout(30*time.Second),
 		)
 		if err != nil {
 			log.Printf("Error extracting from file %s: %v", filePath, err)
@@ -138,34 +163,80 @@ func runFileUploadExamples(ctx context.Context, client *genai.Client, promptProv
 		}
 
 		// Display results
-		fmt.Printf("Project Code: %s\n", result.ProjectCode)
-		fmt.Printf("Project Name: %s\n", result.ProjectName)
-		fmt.Printf("Budget: %.2f %s\n", result.Budget, result.Currency)
-		fmt.Printf("Timeline: %s to %s\n", result.StartDate, result.EndDate)
-		fmt.Printf("Status: %s\n", result.Status)
-		fmt.Printf("Priority: %s\n", result.Priority)
-		fmt.Printf("Project Lead: %s\n", result.ProjectLead)
-		fmt.Printf("Team Size: %d\n", result.TeamSize)
+		fmt.Printf("Organisation: %s (Type: %s)\n", result.Organisation.Name, result.Organisation.DocumentType)
+		fmt.Printf("Financials: Revenue $%.2f, Budget $%.2f\n", result.Organisation.Revenue, result.Organisation.Budget)
+		fmt.Printf("Contact: %s (%s)\n", result.Organisation.Contact.Name, result.Organisation.Contact.Email)
+		fmt.Printf("Projects: %d found\n", len(result.Organisation.Projects))
+		for i, proj := range result.Organisation.Projects {
+			fmt.Printf("  Project %d: %s (%s) - $%.2f\n", i+1, proj.Name, proj.Status, proj.Budget)
+		}
 	}
 }
 
-func runDryRunExample(ctx context.Context, client *genai.Client, promptProvider unstruct.PromptProvider) {
-	// Create unstructor for basic document metadata
-	u := unstruct.New[DocumentMetadata](client, promptProvider)
+func runExplainExample(ctx context.Context, extractor *unstruct.Unstructor[ExtractionRequest]) {
+	// Sample document for explain demonstration
+	sampleDoc := `TechCorp Inc. Financial Report Q4 2024
+	
+	Company: TechCorp Inc.
+	Document Type: Financial Report
+	Revenue: $5,200,000
+	Budget: $6,000,000
+	
+	CEO Contact:
+	Name: Sarah Johnson
+	Email: sarah@techcorp.com
+	Phone: +1-555-0100
+	
+	Active Projects:
+	1. DeepAI - Status: In Progress - Budget: $1,200,000
+	2. CloudScale - Status: Completed - Budget: $800,000
+	3. DataMine - Status: Planning - Budget: $1,500,000`
 
-	textDoc := "Sample document for cost estimation"
-	textAsset := unstruct.NewTextAsset(textDoc)
-	assets := []unstruct.Asset{textAsset}
+	assets := []unstruct.Asset{
+		unstruct.NewTextAsset(sampleDoc),
+	}
 
-	stats, err := u.DryRun(ctx, assets, unstruct.WithModel("gemini-1.5-flash"))
+	// Generate rich explanation with parameters
+	fmt.Println("Execution Plan Analysis:")
+	plan, err := extractor.Explain(ctx, assets,
+		unstruct.WithModel("gemini-1.5-flash"), // Default model
+		unstruct.WithTimeout(30*time.Second),
+	)
+	if err != nil {
+		log.Printf("Error generating explain: %v", err)
+		return
+	}
+
+	fmt.Println(plan)
+
+	fmt.Println("\nParameter Details:")
+	fmt.Println("• basic fields (inherited): gemini-1.5-flash (default model)")
+	fmt.Println("• financial fields: gemini-1.5-pro (precision for numbers)")
+	fmt.Println("• contact fields: gemini-1.5-pro with temperature=0.2, topK=40 (controlled creativity)")
+	fmt.Println("• projects fields: gemini-1.5-flash (fast processing for arrays)")
+	fmt.Println("\nField Inheritance:")
+	fmt.Println("• organisation.name & organisation.docType inherit from organisation struct tag")
+	fmt.Println("• contact.name, contact.email, contact.phone inherit from contact struct tag")
+	fmt.Println("• Query parameters (temperature=0.2, topK=40) applied to contact extraction")
+}
+
+func runDryRunExample(ctx context.Context, extractor *unstruct.Unstructor[ExtractionRequest]) {
+	sampleDoc := "Sample document for cost estimation: Company report with financial data and contacts."
+	assets := []unstruct.Asset{
+		unstruct.NewTextAsset(sampleDoc),
+	}
+
+	stats, err := extractor.DryRun(ctx, assets, unstruct.WithModel("gemini-1.5-flash"))
 	if err != nil {
 		log.Printf("Error in dry run: %v", err)
 		return
 	}
 
-	fmt.Printf("Estimated prompt calls: %d\n", stats.PromptCalls)
-	fmt.Printf("Estimated input tokens: %d\n", stats.TotalInputTokens)
-	fmt.Printf("Estimated output tokens: %d\n", stats.TotalOutputTokens)
+	fmt.Printf("Cost Estimation:\n")
+	fmt.Printf("• Prompt calls: %d\n", stats.PromptCalls)
+	fmt.Printf("• Input tokens: %d\n", stats.TotalInputTokens)
+	fmt.Printf("• Output tokens: %d\n", stats.TotalOutputTokens)
+	fmt.Printf("• Models used: %v\n", stats.ModelCalls)
 }
 
 // findMarkdownFiles looks for .md files in the specified directory
