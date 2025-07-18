@@ -125,9 +125,7 @@ func TestSchemaOf_SimpleStruct(t *testing.T) {
 
 func TestSchemaOf_NestedStruct(t *testing.T) {
 	sch, err := schemaOf[NestedStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Should have multiple prompt groups
 	expectedGroups := []promptKey{
@@ -137,9 +135,8 @@ func TestSchemaOf_NestedStruct(t *testing.T) {
 	}
 
 	for _, expectedKey := range expectedGroups {
-		if _, exists := sch.group2keys[expectedKey]; !exists {
-			t.Errorf("Expected prompt group %+v to exist", expectedKey)
-		}
+		_, exists := sch.group2keys[expectedKey]
+		assert.True(t, exists, "Expected prompt group %+v to exist", expectedKey)
 	}
 
 	// Check nested field paths
@@ -152,17 +149,14 @@ func TestSchemaOf_NestedStruct(t *testing.T) {
 	}
 
 	for _, field := range expectedFields {
-		if _, exists := sch.json2field[field]; !exists {
-			t.Errorf("Expected field %s to exist", field)
-		}
+		_, exists := sch.json2field[field]
+		assert.True(t, exists, "Expected field %s to exist", field)
 	}
 }
 
 func TestSchemaOf_SliceStruct(t *testing.T) {
 	sch, err := schemaOf[SliceStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Check that slice of structs is handled correctly
 	expectedFields := []string{
@@ -174,52 +168,37 @@ func TestSchemaOf_SliceStruct(t *testing.T) {
 	}
 
 	for _, field := range expectedFields {
-		if _, exists := sch.json2field[field]; !exists {
-			t.Errorf("Expected field %s to exist", field)
-		}
+		_, exists := sch.json2field[field]
+		assert.True(t, exists, "Expected field %s to exist", field)
 	}
 }
 
 func TestSchemaOf_ModelOverride(t *testing.T) {
 	sch, err := schemaOf[ModelOverrideStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Check model specifications
 	flashField := sch.json2field["flash"]
-	if flashField.model != "gemini-1.5-flash" {
-		t.Errorf("Expected model 'gemini-1.5-flash', got %s", flashField.model)
-	}
+	assert.Equal(t, "gemini-1.5-flash", flashField.model, "Expected model 'gemini-1.5-flash'")
 
 	proField := sch.json2field["pro"]
-	if proField.model != "gemini-1.5-pro" {
-		t.Errorf("Expected model 'gemini-1.5-pro', got %s", proField.model)
-	}
+	assert.Equal(t, "gemini-1.5-pro", proField.model, "Expected model 'gemini-1.5-pro'")
 
 	modelOnlyField := sch.json2field["model_only"]
-	if modelOnlyField.model != "gemini-1.5-flash-8b" {
-		t.Errorf("Expected model 'gemini-1.5-flash-8b', got %s", modelOnlyField.model)
-	}
+	assert.Equal(t, "gemini-1.5-flash-8b", modelOnlyField.model, "Expected model 'gemini-1.5-flash-8b'")
 
 	basicField := sch.json2field["basic"]
-	if basicField.model != "" {
-		t.Errorf("Expected empty model for basic field, got %s", basicField.model)
-	}
+	assert.Empty(t, basicField.model, "Expected empty model for basic field")
 }
 
 func TestSchemaOf_Inheritance(t *testing.T) {
 	sch, err := schemaOf[InheritanceStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Check that child1 inherits the prompt
 	inheritedKey := promptKey{prompt: "inherited_prompt", parentPath: "parent"}
 	keys, exists := sch.group2keys[inheritedKey]
-	if !exists {
-		t.Error("Expected inherited prompt group to exist")
-	}
+	assert.True(t, exists, "Expected inherited prompt group to exist")
 
 	found := false
 	for _, key := range keys {
@@ -228,16 +207,12 @@ func TestSchemaOf_Inheritance(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Error("Expected parent.child1 to inherit prompt")
-	}
+	assert.True(t, found, "Expected parent.child1 to inherit prompt")
 
 	// Check that child2 overrides the prompt
 	overrideKey := promptKey{prompt: "override", parentPath: "parent"}
 	keys, exists = sch.group2keys[overrideKey]
-	if !exists {
-		t.Error("Expected override prompt group to exist")
-	}
+	assert.True(t, exists, "Expected override prompt group to exist")
 
 	found = false
 	for _, key := range keys {
@@ -246,59 +221,43 @@ func TestSchemaOf_Inheritance(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Error("Expected parent.child2 to override prompt")
-	}
+	assert.True(t, found, "Expected parent.child2 to override prompt")
 }
 
 func TestSchemaOf_EdgeCases(t *testing.T) {
 	sch, err := schemaOf[EdgeCaseStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Check ignored fields are not included
-	if _, exists := sch.json2field["ignored"]; exists {
-		t.Error("Ignored field should not exist in schema")
-	}
+	_, exists := sch.json2field["ignored"]
+	assert.False(t, exists, "Ignored field should not exist in schema")
 
-	if _, exists := sch.json2field["unexported"]; exists {
-		t.Error("Unexported field should not exist in schema")
-	}
+	_, exists = sch.json2field["unexported"]
+	assert.False(t, exists, "Unexported field should not exist in schema")
 
 	// Check that fields without tags still get included
-	if _, exists := sch.json2field["no_tag"]; !exists {
-		t.Error("Field without tag should still exist")
-	}
+	_, exists = sch.json2field["no_tag"]
+	assert.True(t, exists, "Field without tag should still exist")
 
 	// Check time field is treated as leaf (not struct)
-	if _, exists := sch.json2field["time_field"]; !exists {
-		t.Error("Time field should exist as leaf")
-	}
+	_, exists = sch.json2field["time_field"]
+	assert.True(t, exists, "Time field should exist as leaf")
 }
 
 func TestSchemaOf_NonStructType(t *testing.T) {
 	// Test with non-struct type
 	type StringType string
 	_, err := schemaOf[StringType]()
-	if err == nil {
-		t.Error("Expected error for non-struct type")
-	}
-	if err != nil && err.Error() != "unstruct: T must be struct" {
-		t.Errorf("Expected specific error message, got: %v", err)
-	}
+	assert.Error(t, err, "Expected error for non-struct type")
+	assert.Equal(t, "unstruct: T must be struct", err.Error(), "Expected specific error message")
 
 	// Test with slice type
 	_, err = schemaOf[[]string]()
-	if err == nil {
-		t.Error("Expected error for slice type")
-	}
+	assert.Error(t, err, "Expected error for slice type")
 
 	// Test with map type
 	_, err = schemaOf[map[string]string]()
-	if err == nil {
-		t.Error("Expected error for map type")
-	}
+	assert.Error(t, err, "Expected error for map type")
 }
 
 func TestJoinKey(t *testing.T) {
@@ -312,10 +271,8 @@ func TestJoinKey(t *testing.T) {
 
 	for _, test := range tests {
 		result := joinKey(test.parent, test.child)
-		if result != test.expected {
-			t.Errorf("joinKey(%q, %q) = %q, expected %q",
-				test.parent, test.child, result, test.expected)
-		}
+		assert.Equal(t, test.expected, result, "joinKey(%q, %q) = %q, expected %q",
+			test.parent, test.child, result, test.expected)
 	}
 }
 
@@ -335,10 +292,8 @@ func TestIsPureStruct(t *testing.T) {
 
 	for _, test := range tests {
 		result := isPureStruct(test.typ)
-		if result != test.expected {
-			t.Errorf("isPureStruct(%v) = %v, expected %v",
-				test.typ, result, test.expected)
-		}
+		assert.Equal(t, test.expected, result, "isPureStruct(%v) = %v, expected %v",
+			test.typ, result, test.expected)
 	}
 }
 
@@ -351,60 +306,40 @@ func TestSchemaGrouping(t *testing.T) {
 	}
 
 	sch, err := schemaOf[GroupingTest]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Check group1 has 2 fields
 	group1Key := promptKey{prompt: "group1", parentPath: ""}
 	keys1, exists := sch.group2keys[group1Key]
-	if !exists {
-		t.Error("Expected group1 to exist")
-	}
-	if len(keys1) != 2 {
-		t.Errorf("Expected 2 keys in group1, got %d", len(keys1))
-	}
+	assert.True(t, exists, "Expected group1 to exist")
+	assert.Len(t, keys1, 2, "Expected 2 keys in group1")
 
 	// Check group2 has 2 fields
 	group2Key := promptKey{prompt: "group2", parentPath: ""}
 	keys2, exists := sch.group2keys[group2Key]
-	if !exists {
-		t.Error("Expected group2 to exist")
-	}
-	if len(keys2) != 2 {
-		t.Errorf("Expected 2 keys in group2, got %d", len(keys2))
-	}
+	assert.True(t, exists, "Expected group2 to exist")
+	assert.Len(t, keys2, 2, "Expected 2 keys in group2")
 }
 
 func TestSchemaOf_ProviderPrefixModels(t *testing.T) {
 	sch, err := schemaOf[ProviderPrefixStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Check that googleai/ prefixed model is preserved as-is
 	googleAIField := sch.json2field["googleai_field"]
-	if googleAIField.model != "googleai/gemini-1.5-pro" {
-		t.Errorf("Expected model 'googleai/gemini-1.5-pro', got %s", googleAIField.model)
-	}
+	assert.Equal(t, "googleai/gemini-1.5-pro", googleAIField.model, "Expected model 'googleai/gemini-1.5-pro'")
 
 	// Check that plain model name is preserved
 	plainField := sch.json2field["plain_field"]
-	if plainField.model != "gemini-1.5-pro" {
-		t.Errorf("Expected model 'gemini-1.5-pro', got %s", plainField.model)
-	}
+	assert.Equal(t, "gemini-1.5-pro", plainField.model, "Expected model 'gemini-1.5-pro'")
 
 	// Check that unknown/custom model name is preserved
 	unknownField := sch.json2field["unknown_field"]
-	if unknownField.model != "custom-model-name" {
-		t.Errorf("Expected model 'custom-model-name', got %s", unknownField.model)
-	}
+	assert.Equal(t, "custom-model-name", unknownField.model, "Expected model 'custom-model-name'")
 
 	// Check that flash model is preserved
 	flashField := sch.json2field["flash_field"]
-	if flashField.model != "gemini-1.5-flash" {
-		t.Errorf("Expected model 'gemini-1.5-flash', got %s", flashField.model)
-	}
+	assert.Equal(t, "gemini-1.5-flash", flashField.model, "Expected model 'gemini-1.5-flash'")
 
 	// Check prompt grouping with different models
 	expectedGroups := []promptKey{
@@ -415,17 +350,14 @@ func TestSchemaOf_ProviderPrefixModels(t *testing.T) {
 	}
 
 	for _, expectedKey := range expectedGroups {
-		if _, exists := sch.group2keys[expectedKey]; !exists {
-			t.Errorf("Expected prompt group %+v to exist", expectedKey)
-		}
+		_, exists := sch.group2keys[expectedKey]
+		assert.True(t, exists, "Expected prompt group %+v to exist", expectedKey)
 	}
 }
 
 func TestNewSyntaxFormats(t *testing.T) {
 	sch, err := schemaOf[NewSyntaxStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	testCases := []struct {
 		field          string
@@ -480,13 +412,9 @@ func TestNewSyntaxFormats(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			fieldSpec, exists := sch.json2field[tc.field]
-			if !exists {
-				t.Fatalf("Field %s should exist in schema", tc.field)
-			}
+			assert.True(t, exists, "Field %s should exist in schema", tc.field)
 
-			if fieldSpec.model != tc.expectedModel {
-				t.Errorf("Field %s: Expected model '%s', got '%s'", tc.field, tc.expectedModel, fieldSpec.model)
-			}
+			assert.Equal(t, tc.expectedModel, fieldSpec.model, "Field %s: Expected model '%s', got '%s'", tc.field, tc.expectedModel, fieldSpec.model)
 
 			// Check that the field is in the correct prompt group
 			found := false
@@ -503,10 +431,8 @@ func TestNewSyntaxFormats(t *testing.T) {
 					}
 				}
 			}
-			if !found {
-				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')",
-					tc.field, tc.expectedPrompt, tc.expectedModel)
-			}
+			assert.True(t, found, "Field %s not found in expected prompt group (prompt='%s', model='%s')",
+				tc.field, tc.expectedPrompt, tc.expectedModel)
 		})
 	}
 }
@@ -560,12 +486,8 @@ func TestTagParsing_NewFormats(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			result := parseUnstructTag(tc.tag, tc.inheritedPrompt)
-			if result.prompt != tc.expectedPrompt {
-				t.Errorf("Tag %q: Expected prompt '%s', got '%s'", tc.tag, tc.expectedPrompt, result.prompt)
-			}
-			if result.model != tc.expectedModel {
-				t.Errorf("Tag %q: Expected model '%s', got '%s'", tc.tag, tc.expectedModel, result.model)
-			}
+			assert.Equal(t, tc.expectedPrompt, result.prompt, "Tag %q: Expected prompt '%s', got '%s'", tc.tag, tc.expectedPrompt, result.prompt)
+			assert.Equal(t, tc.expectedModel, result.model, "Tag %q: Expected model '%s', got '%s'", tc.tag, tc.expectedModel, result.model)
 		})
 	}
 }
@@ -580,9 +502,7 @@ type ProviderPrefixIssueStruct struct {
 
 func TestProviderPrefixModelRecognition(t *testing.T) {
 	sch, err := schemaOf[ProviderPrefixIssueStruct]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	testCases := []struct {
 		field         string
@@ -619,18 +539,12 @@ func TestProviderPrefixModelRecognition(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			fieldSpec, exists := sch.json2field[tc.field]
-			if !exists {
-				t.Fatalf("Field %s should exist in schema", tc.field)
-			}
+			assert.True(t, exists, "Field %s should exist in schema", tc.field)
 
 			if tc.shouldBeModel {
-				if fieldSpec.model != tc.expectedModel {
-					t.Errorf("Expected model '%s', got '%s'", tc.expectedModel, fieldSpec.model)
-				}
+				assert.Equal(t, tc.expectedModel, fieldSpec.model, "Expected model '%s', got '%s'", tc.expectedModel, fieldSpec.model)
 			} else {
-				if fieldSpec.model != "" {
-					t.Errorf("Expected empty model (treated as prompt), got '%s'", fieldSpec.model)
-				}
+				assert.Empty(t, fieldSpec.model, "Expected empty model (treated as prompt), got '%s'", fieldSpec.model)
 			}
 		})
 	}
@@ -705,9 +619,7 @@ type ComprehensiveSyntaxTest struct {
 
 func TestComprehensiveSyntax(t *testing.T) {
 	sch, err := schemaOf[ComprehensiveSyntaxTest]()
-	if err != nil {
-		t.Fatalf("schemaOf failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	testCases := []struct {
 		field          string
@@ -736,13 +648,9 @@ func TestComprehensiveSyntax(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			fieldSpec, exists := sch.json2field[tc.field]
-			if !exists {
-				t.Fatalf("Field %s should exist in schema", tc.field)
-			}
+			assert.True(t, exists, "Field %s should exist in schema", tc.field)
 
-			if fieldSpec.model != tc.expectedModel {
-				t.Errorf("Field %s: Expected model '%s', got '%s'", tc.field, tc.expectedModel, fieldSpec.model)
-			}
+			assert.Equal(t, tc.expectedModel, fieldSpec.model, "Field %s: Expected model '%s', got '%s'", tc.field, tc.expectedModel, fieldSpec.model)
 
 			// Verify the field is in the correct prompt group
 			found := false
@@ -759,15 +667,13 @@ func TestComprehensiveSyntax(t *testing.T) {
 					}
 				}
 			}
-			if !found {
-				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')",
-					tc.field, tc.expectedPrompt, tc.expectedModel)
-			}
+			assert.True(t, found, "Field %s not found in expected prompt group (prompt='%s', model='%s')",
+				tc.field, tc.expectedPrompt, tc.expectedModel)
 		})
 	} // Verify we have the expected number of distinct groups
 	expectedGroupCount := 12 // Count distinct (prompt, model) combinations
+	assert.Len(t, sch.group2keys, expectedGroupCount, "Expected %d prompt groups", expectedGroupCount)
 	if len(sch.group2keys) != expectedGroupCount {
-		t.Errorf("Expected %d prompt groups, got %d", expectedGroupCount, len(sch.group2keys))
 		for pk, fields := range sch.group2keys {
 			t.Logf("Group: prompt='%s', model='%s', parentPath='%s', fields=%v",
 				pk.prompt, pk.model, pk.parentPath, fields)
@@ -797,9 +703,7 @@ type AerialsStruct struct {
 func TestNestedStructFieldMappingFix(t *testing.T) {
 	t.Run("Schema Generation for Nested Structs", func(t *testing.T) {
 		sch, err := schemaOf[AerialsStruct]()
-		if err != nil {
-			t.Fatalf("schemaOf failed: %v", err)
-		}
+		require.NoError(t, err)
 
 		// Check if nested struct fields are in the schema
 		expectedFields := []string{
@@ -813,15 +717,15 @@ func TestNestedStructFieldMappingFix(t *testing.T) {
 		}
 
 		for _, field := range expectedFields {
-			if _, exists := sch.json2field[field]; !exists {
-				t.Errorf("Expected field %s to exist in schema", field)
-			}
+			_, exists := sch.json2field[field]
+			assert.True(t, exists, "Expected field %s to exist in schema", field)
 		}
 
 		// Check if intermediate struct fields are in the schema (this should be fixed now)
 		intermediateFields := []string{"Project", "Meta"}
 		for _, field := range intermediateFields {
-			if _, exists := sch.json2field[field]; !exists {
+			_, exists := sch.json2field[field]
+			if !exists {
 				t.Errorf("Intermediate field %s missing from schema", field)
 			} else {
 				t.Logf("Intermediate field %s now exists in schema", field)
@@ -849,28 +753,18 @@ func TestNestedStructFieldMappingFix(t *testing.T) {
 		}`
 
 		sch, err := schemaOf[AerialsStruct]()
-		if err != nil {
-			t.Fatalf("schemaOf failed: %v", err)
-		}
+		require.NoError(t, err)
 
 		var result AerialsStruct
 		err = patchStruct(&result, []byte(nestedJSON), sch.json2field)
-		if err != nil {
-			t.Fatalf("patchStruct failed: %v", err)
-		}
+		require.NoError(t, err)
 
 		// Check if nested fields are populated (should be fixed now)
-		if result.Project.ProjectCode != "TEST-001" {
-			t.Errorf("Expected Project.ProjectCode 'TEST-001', got '%s'", result.Project.ProjectCode)
-		} else {
-			t.Logf("Project.ProjectCode correctly set to '%s'", result.Project.ProjectCode)
-		}
+		assert.Equal(t, "TEST-001", result.Project.ProjectCode, "Expected Project.ProjectCode 'TEST-001'")
+		t.Logf("Project.ProjectCode correctly set to '%s'", result.Project.ProjectCode)
 
-		if result.Meta.ParserVersion != "1.0.0" {
-			t.Errorf("Expected Meta.ParserVersion '1.0.0', got '%s'", result.Meta.ParserVersion)
-		} else {
-			t.Logf("Meta.ParserVersion correctly set to '%s'", result.Meta.ParserVersion)
-		}
+		assert.Equal(t, "1.0.0", result.Meta.ParserVersion, "Expected Meta.ParserVersion '1.0.0'")
+		t.Logf("Meta.ParserVersion correctly set to '%s'", result.Meta.ParserVersion)
 
 		t.Logf("Final Result: %+v", result)
 	})
