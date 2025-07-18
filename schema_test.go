@@ -441,10 +441,10 @@ func TestNewSyntaxFormats(t *testing.T) {
 	}
 
 	testCases := []struct {
-		field           string
-		expectedPrompt  string
-		expectedModel   string
-		description     string
+		field          string
+		expectedPrompt string
+		expectedModel  string
+		description    string
 	}{
 		{
 			field:          "explicit",
@@ -517,7 +517,7 @@ func TestNewSyntaxFormats(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')", 
+				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')",
 					tc.field, tc.expectedPrompt, tc.expectedModel)
 			}
 		})
@@ -527,46 +527,46 @@ func TestNewSyntaxFormats(t *testing.T) {
 func TestTagParsing_NewFormats(t *testing.T) {
 	// Test direct tag parsing with the new parseUnstructTag function
 	testCases := []struct {
-		tag            string
+		tag             string
 		inheritedPrompt string
-		expectedPrompt string
-		expectedModel  string
-		description    string
+		expectedPrompt  string
+		expectedModel   string
+		description     string
 	}{
 		{
-			tag:            "model/openai/gpt-4",
+			tag:             "model/openai/gpt-4",
 			inheritedPrompt: "inherited",
-			expectedPrompt: "inherited",
-			expectedModel:  "openai/gpt-4",
-			description:    "model/ prefix should inherit prompt and set model",
+			expectedPrompt:  "inherited",
+			expectedModel:   "openai/gpt-4",
+			description:     "model/ prefix should inherit prompt and set model",
 		},
 		{
-			tag:            "prompt/my_extraction",
+			tag:             "prompt/my_extraction",
 			inheritedPrompt: "",
-			expectedPrompt: "my_extraction",
-			expectedModel:  "",
-			description:    "prompt/ prefix should set prompt and no model",
+			expectedPrompt:  "my_extraction",
+			expectedModel:   "",
+			description:     "prompt/ prefix should set prompt and no model",
 		},
 		{
-			tag:            "custom_prompt,custom_model",
+			tag:             "custom_prompt,custom_model",
 			inheritedPrompt: "",
-			expectedPrompt: "custom_prompt",
-			expectedModel:  "custom_model",
-			description:    "explicit format should work",
+			expectedPrompt:  "custom_prompt",
+			expectedModel:   "custom_model",
+			description:     "explicit format should work",
 		},
 		{
-			tag:            "just_prompt",
+			tag:             "just_prompt",
 			inheritedPrompt: "",
-			expectedPrompt: "just_prompt",
-			expectedModel:  "",
-			description:    "single value should be treated as prompt",
+			expectedPrompt:  "just_prompt",
+			expectedModel:   "",
+			description:     "single value should be treated as prompt",
 		},
 		{
-			tag:            "",
+			tag:             "",
 			inheritedPrompt: "parent_prompt",
-			expectedPrompt: "parent_prompt",
-			expectedModel:  "",
-			description:    "empty tag should inherit prompt",
+			expectedPrompt:  "parent_prompt",
+			expectedModel:   "",
+			description:     "empty tag should inherit prompt",
 		},
 	}
 
@@ -692,26 +692,26 @@ func BenchmarkSchemaOf(b *testing.B) {
 type ComprehensiveSyntaxTest struct {
 	// Explicit prompt,model format
 	ExplicitField string `json:"explicit" unstruct:"extract_title,googleai/gemini-1.5-pro"`
-	
+
 	// Model-only with various providers
-	GoogleAIField   string `json:"googleai" unstruct:"model/googleai/gemini-1.5-flash"`
-	VertexField     string `json:"vertex" unstruct:"model/vertex/gemini-1.5-pro"`
-	AnthropicField  string `json:"anthropic" unstruct:"model/anthropic/claude-3-sonnet"`
-	OpenAIField     string `json:"openai" unstruct:"model/openai/gpt-4"`
-	CustomField     string `json:"custom" unstruct:"model/custom-provider/my-model-v2"`
-	
+	GoogleAIField  string `json:"googleai" unstruct:"model/googleai/gemini-1.5-flash"`
+	VertexField    string `json:"vertex" unstruct:"model/vertex/gemini-1.5-pro"`
+	AnthropicField string `json:"anthropic" unstruct:"model/anthropic/claude-3-sonnet"`
+	OpenAIField    string `json:"openai" unstruct:"model/openai/gpt-4"`
+	CustomField    string `json:"custom" unstruct:"model/custom-provider/my-model-v2"`
+
 	// Prompt-only formats
 	PromptPrefixField string `json:"prompt_prefix" unstruct:"prompt/special_extraction"`
 	PromptOnlyField   string `json:"prompt_only" unstruct:"basic_prompt"`
-	
+
 	// Nested structure with inheritance
 	NestedStruct struct {
-		InheritedField1 string `json:"inherited1"`                               // Inherits everything
-		InheritedField2 string `json:"inherited2"`                               // Inherits everything  
-		OverridePrompt  string `json:"override_prompt" unstruct:"new_prompt"`    // Override prompt only
+		InheritedField1 string `json:"inherited1"`                                // Inherits everything
+		InheritedField2 string `json:"inherited2"`                                // Inherits everything
+		OverridePrompt  string `json:"override_prompt" unstruct:"new_prompt"`     // Override prompt only
 		OverrideModel   string `json:"override_model" unstruct:"model/new/model"` // Override model only
 	} `json:"nested" unstruct:"nested_extraction,vertex/gemini-1.5-flash"`
-	
+
 	// Empty tag (full inheritance)
 	EmptyTagField string `json:"empty_tag" unstruct:""`
 }
@@ -738,7 +738,7 @@ func TestComprehensiveSyntax(t *testing.T) {
 		{"prompt_prefix", "special_extraction", "", "prompt/ prefix"},
 		{"prompt_only", "basic_prompt", "", "prompt only"},
 		{"empty_tag", "", "", "empty tag inheritance"},
-		
+
 		// Nested field tests
 		{"nested.inherited1", "nested_extraction", "vertex/gemini-1.5-flash", "nested inheritance"},
 		{"nested.inherited2", "nested_extraction", "vertex/gemini-1.5-flash", "nested inheritance"},
@@ -773,16 +773,16 @@ func TestComprehensiveSyntax(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')", 
+				t.Errorf("Field %s not found in expected prompt group (prompt='%s', model='%s')",
 					tc.field, tc.expectedPrompt, tc.expectedModel)
 			}
 		})
-	}    // Verify we have the expected number of distinct groups
-    expectedGroupCount := 12 // Count distinct (prompt, model) combinations
-    if len(sch.group2keys) != expectedGroupCount {
+	} // Verify we have the expected number of distinct groups
+	expectedGroupCount := 12 // Count distinct (prompt, model) combinations
+	if len(sch.group2keys) != expectedGroupCount {
 		t.Errorf("Expected %d prompt groups, got %d", expectedGroupCount, len(sch.group2keys))
 		for pk, fields := range sch.group2keys {
-			t.Logf("Group: prompt='%s', model='%s', parentPath='%s', fields=%v", 
+			t.Logf("Group: prompt='%s', model='%s', parentPath='%s', fields=%v",
 				pk.prompt, pk.model, pk.parentPath, fields)
 		}
 	}
@@ -809,7 +809,7 @@ type AerialsStruct struct {
 
 func TestNestedStructFieldMappingFix(t *testing.T) {
 	t.Run("Schema Generation for Nested Structs", func(t *testing.T) {
-sch, err := schemaOf[AerialsStruct]()
+		sch, err := schemaOf[AerialsStruct]()
 		if err != nil {
 			t.Fatalf("schemaOf failed: %v", err)
 		}
@@ -817,7 +817,7 @@ sch, err := schemaOf[AerialsStruct]()
 		// Check if nested struct fields are in the schema
 		expectedFields := []string{
 			"Project.ProjectCode",
-			"Project.BSNumber", 
+			"Project.BSNumber",
 			"Project.BSName",
 			"Project.Standards",
 			"Meta.ParserVersion",
@@ -846,8 +846,8 @@ sch, err := schemaOf[AerialsStruct]()
 	})
 
 	t.Run("JSON Patching with Nested Structure", func(t *testing.T) {
-// This is the nested JSON that AI returns
-nestedJSON := `{
+		// This is the nested JSON that AI returns
+		nestedJSON := `{
 			"Project": {
 				"ProjectCode": "TEST-001",
 				"BSNumber": "BS-123", 
@@ -861,7 +861,7 @@ nestedJSON := `{
 			}
 		}`
 
-sch, err := schemaOf[AerialsStruct]()
+		sch, err := schemaOf[AerialsStruct]()
 		if err != nil {
 			t.Fatalf("schemaOf failed: %v", err)
 		}
@@ -878,7 +878,7 @@ sch, err := schemaOf[AerialsStruct]()
 		} else {
 			t.Logf("✅ FIXED: Project.ProjectCode correctly set to '%s'", result.Project.ProjectCode)
 		}
-		
+
 		if result.Meta.ParserVersion != "1.0.0" {
 			t.Errorf("❌ STILL BROKEN: Expected Meta.ParserVersion '1.0.0', got '%s'", result.Meta.ParserVersion)
 		} else {
