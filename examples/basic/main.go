@@ -115,10 +115,10 @@ func main() {
 	// 1️⃣
 	slog.Debug("Setting up prompts", "prompt_count", 4)
 	prompts := filePrompts{
-		"basic":     "Extract basic info: {{.Keys}} from: {{.Document}}",
-		"financial": "Find financial data ({{.Keys}}) in: {{.Document}}. Return numeric values only (e.g., 2500000 for $2.5M).",
-		"contact":   "Extract contact details ({{.Keys}}) from: {{.Document}}",
-		"projects":  "List all projects with {{.Keys}} from: {{.Document}}. Return budget as numeric values only (e.g., 500000 for $500K).",
+		"basic":     "Extract basic info: {{.Keys}} from: {{.Document}}. Return JSON with exact field structure.",
+		"financial": "Find financial data ({{.Keys}}) in: {{.Document}}. Return numeric values only (e.g., 2500000 for $2.5M). Use exact JSON structure: {\"organisation\": {\"revenue\": number, \"budget\": number}}",
+		"contact":   "Extract contact details ({{.Keys}}) from: {{.Document}}. Return JSON with exact field structure.",
+		"projects":  "List all projects with {{.Keys}} from: {{.Document}}. Return budget as numeric values only (e.g., 500000 for $500K). Use exact JSON structure: {\"organisation\": {\"projects\": [{\"name\": string, \"status\": string, \"budget\": number}]}}",
 	}
 	slog.Debug("prompts configured", "basic_prompt_length", len(prompts["basic"]), "financial_prompt_length", len(prompts["financial"]), "contact_prompt_length", len(prompts["contact"]), "projects_prompt_length", len(prompts["projects"]))
 

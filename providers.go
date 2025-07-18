@@ -90,6 +90,8 @@ func (p *StickPromptProvider) GetPrompt(tag string, version int) (string, error)
 	templateCtx := make(map[string]stick.Value)
 	templateCtx["version"] = version
 	templateCtx["tag"] = tag
+	templateCtx["Version"] = version // Capitalized version for consistency
+	templateCtx["Tag"] = tag         // Capitalized version for consistency
 
 	// Add custom variables
 	for k, v := range p.vars {
@@ -114,8 +116,11 @@ func (p *StickPromptProvider) GetPromptWithContext(tag string, version int, keys
 	templateCtx := make(map[string]stick.Value)
 	templateCtx["version"] = version
 	templateCtx["tag"] = tag
+	templateCtx["Version"] = version // Capitalized version for consistency
+	templateCtx["Tag"] = tag         // Capitalized version for consistency
 	templateCtx["keys"] = keys
 	templateCtx["Keys"] = keys
+	templateCtx["KeyList"] = strings.Join(keys, ", ") // Comma-separated string of keys
 	templateCtx["document"] = document
 	templateCtx["Document"] = document
 

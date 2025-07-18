@@ -1,6 +1,6 @@
 Extract financial information from this document image (File URI: {{ fileURI }}):
 
-Look for and extract: {{ Keys|join(', ') }}
+Look for and extract: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 Pay special attention to:
 - Numbers with currency symbols ($, €, £, etc.)
 - Totals, subtotals, and grand totals  

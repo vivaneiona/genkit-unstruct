@@ -3,7 +3,6 @@ default:
     @just -f {{source_file()}} --unsorted --list --list-prefix '{{BOLD}}➤ {{NORMAL}}' --list-heading $'' | sed 's/^   //g'
 
 mod? openai_and_gemini 'openai_and_gemini/.justfile'
-
 mod? basic 'basic/.justfile'
 mod? stick 'stick/.justfile'
 mod? complex 'complex/.justfile'

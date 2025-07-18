@@ -6,6 +6,6 @@ For each line item, extract: description, quantity, unitPrice, total
 Return as JSON object with "lineItems" field containing an array of objects. If no line items found, return {"lineItems": []}.
 Example format: {"lineItems": [{"description": "Item 1", "quantity": 1, "unitPrice": 10.0, "total": 10.0}]}
 
-Extract the following fields: {{ Keys|join(', ') }}
+Extract the following fields: {{ KeyList }}
 
 Document text: {{ Document }}

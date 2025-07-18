@@ -54,7 +54,6 @@ func main() {
 	}
 
 	// Setup client
-	fmt.Println("Enhanced Assets Example with URL-style Syntax")
 	fmt.Println("Creating Google GenAI client...")
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Backend: genai.BackendGeminiAPI,

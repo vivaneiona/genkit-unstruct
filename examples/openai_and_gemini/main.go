@@ -11,8 +11,8 @@ import (
 	"google.golang.org/genai"
 )
 
-// Business document structure demonstrating different model selection strategies
-type MultiModelExtractionRequest struct {
+// Demonstrating different model selection strategies
+type ExtractionRequest struct {
 	// Basic company info - using Gemini Flash for speed and cost efficiency
 	Company struct {
 		Name         string `json:"name"`
@@ -90,7 +90,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Multi-Model Extraction Example")
+	fmt.Println("Extraction Example")
 	fmt.Println("==============================")
 	fmt.Println("Demonstrating different Gemini models with varied parameters")
 	fmt.Println("Note: For OpenAI integration, see the openai example")
@@ -149,10 +149,10 @@ Return JSON with exact field structure.`,
 	}
 
 	// Create extractor
-	extractor := unstruct.New[MultiModelExtractionRequest](client, prompts)
+	extractor := unstruct.New[ExtractionRequest](client, prompts)
 
 	// Example 1: Comprehensive company analysis
-	fmt.Println("\n=== Multi-Model Company Analysis ===")
+	fmt.Println("\n=== Company Analysis ===")
 	runCompanyAnalysis(ctx, extractor)
 
 	// Example 2: Model strategy explanation
@@ -164,7 +164,7 @@ Return JSON with exact field structure.`,
 	runPerformanceAnalysis(ctx, extractor)
 }
 
-func runCompanyAnalysis(ctx context.Context, extractor *unstruct.Unstructor[MultiModelExtractionRequest]) {
+func runCompanyAnalysis(ctx context.Context, extractor *unstruct.Unstructor[ExtractionRequest]) {
 	// Comprehensive company document
 	companyDoc := `
 TechFlow Solutions Inc. - Comprehensive Company Report 2024
@@ -311,7 +311,7 @@ Market Trends:
 	fmt.Printf("  Market Trends: %d identified\n", len(result.Competitive.MarketTrends))
 }
 
-func runModelStrategyAnalysis(ctx context.Context, extractor *unstruct.Unstructor[MultiModelExtractionRequest]) {
+func runModelStrategyAnalysis(ctx context.Context, extractor *unstruct.Unstructor[ExtractionRequest]) {
 	sampleDoc := "TechFlow Solutions Inc. - Brief company overview for model analysis"
 	assets := []unstruct.Asset{
 		unstruct.NewTextAsset(sampleDoc),
@@ -326,12 +326,12 @@ func runModelStrategyAnalysis(ctx context.Context, extractor *unstruct.Unstructo
 	fmt.Println("Model Distribution and Execution Plan:")
 	fmt.Println(plan)
 	fmt.Println("\nModel Selection Strategy:")
-	fmt.Println("� Gemini Flash      → Basic facts (optimize for speed & cost)")
-	fmt.Println("� Gemini Pro (T=0.1) → Financial data (optimize for precision)")
-	fmt.Println("� Gemini Pro        → Technical analysis (domain knowledge)")
-	fmt.Println("🎨 Gemini Pro (T=0.3) → Strategic insights (creative reasoning)")
-	fmt.Println("� Gemini Pro (T=0.1) → Contact extraction (maximize accuracy)")
-	fmt.Println("🧠 Gemini 2.0 Flash  → Competitive analysis (advanced reasoning)")
+	fmt.Println("Gemini Flash      → Basic facts (optimize for speed & cost)")
+	fmt.Println("Gemini Pro (T=0.1) → Financial data (optimize for precision)")
+	fmt.Println("Gemini Pro        → Technical analysis (domain knowledge)")
+	fmt.Println("Gemini Pro (T=0.3) → Strategic insights (creative reasoning)")
+	fmt.Println("Gemini Pro (T=0.1) → Contact extraction (maximize accuracy)")
+	fmt.Println("Gemini 2.0 Flash  → Competitive analysis (advanced reasoning)")
 
 	fmt.Println("\nParameter Tuning:")
 	fmt.Println("• Temperature 0.1: High precision for financial/contact data")
@@ -340,7 +340,7 @@ func runModelStrategyAnalysis(ctx context.Context, extractor *unstruct.Unstructo
 	fmt.Println("• TopK=40: Broader selection for strategic creativity")
 }
 
-func runPerformanceAnalysis(ctx context.Context, extractor *unstruct.Unstructor[MultiModelExtractionRequest]) {
+func runPerformanceAnalysis(ctx context.Context, extractor *unstruct.Unstructor[ExtractionRequest]) {
 	sampleDoc := "Sample company document for performance estimation"
 	assets := []unstruct.Asset{
 		unstruct.NewTextAsset(sampleDoc),

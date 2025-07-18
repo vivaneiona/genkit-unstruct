@@ -226,10 +226,17 @@ Focus on identifying:
 - Contact information
 - Business relationships
 
-Extract these specific fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
+Extract these specific fields: {{ KeyList }}
 
 Return as JSON with exact field names.
 ```
+
+**Template variables available:**
+- `{{ Keys }}` - Array of field names for iteration: `{% for key in Keys %}{{ key }}{% endfor %}`
+- `{{ KeyList }}` - Comma-separated string of field names: `"name, age, email"`
+- `{{ Document }}` - The document content when using text assets
+- `{{ Version }}` - Template version number
+- `{{ Tag }}` - Template tag name
 
 **Note:** When using assets (files, images, text), the document content is automatically added to the AI message. You don't need to include `Document: {{ Document }}` in your templates - the assets are passed directly to the model alongside your prompt.
 
@@ -331,14 +338,13 @@ genkit-unstract git:(main) ✗ just do
 
 
 ```bash
-➜  genkit-unstract git:(main) ✗ just do assets run
 🚀 Running Enhanced Assets Example
 go run main.go
 Enhanced Assets Example with URL-style Syntax
 Creating Google GenAI client...
 
 === Text Document Example ===
-2025/07/19 04:20:57 INFO Extraction completed successfully type=main.ExtractionRequest
+2025/07/19 05:57:51 INFO Extraction completed successfully type=main.ExtractionRequest
 Organisation: TechCorp Inc. (Type: Annual Report)
 Financials: Revenue $2500000.00, Budget $3000000.00
 Contact: John Smith (john@techcorp.com)
@@ -349,7 +355,7 @@ Projects: 2 found
 === File Upload Examples ===
 
 --- Processing: meeting-minutes.md ---
-2025/07/19 04:21:03 INFO Extraction completed successfully type=main.ExtractionRequest
+2025/07/19 05:57:56 INFO Extraction completed successfully type=main.ExtractionRequest
 Organisation:  (Type: Meeting Minutes)
 Financials: Revenue $2300000.00, Budget $800000.00
 Contact:  ()
@@ -357,15 +363,15 @@ Projects: 9 found
   Project 1: Migrate to microservices architecture (Complete) - $800000.00
   Project 2: Implement new authentication system (Complete) - $800000.00
   Project 3: Reduce page load times by 30% (Complete) - $800000.00
-  Project 4: Launch mobile application (iOS/Android) (Beta) - $200000.00
-  Project 5: Beta test AI recommendation engine (Beta) - $200000.00
-  Project 6: Integrate with 5 new third-party APIs (In progress) - $200000.00
-  Project 7: Rebrand company visual identity (In progress) - $120000.00
-  Project 8: Launch content marketing campaign (In progress) - $120000.00
-  Project 9: Attend 4 industry conferences (In progress) - $120000.00
+  Project 4: Launch mobile application (iOS/Android) (Complete) - $200000.00
+  Project 5: Beta test AI recommendation engine (Complete) - $200000.00
+  Project 6: Integrate with 5 new third-party APIs (Complete) - $200000.00
+  Project 7: Rebrand company visual identity (Complete) - $120000.00
+  Project 8: Launch content marketing campaign (Complete) - $120000.00
+  Project 9: Attend 4 industry conferences (Complete) - $120000.00
 
 --- Processing: product-requirements.md ---
-2025/07/19 04:21:07 INFO Extraction completed successfully type=main.ExtractionRequest
+2025/07/19 05:58:00 INFO Extraction completed successfully type=main.ExtractionRequest
 Organisation: EduTech Solutions Inc. (Type: Product Requirements Document)
 Financials: Revenue $500000.00, Budget $2000000.00
 Contact:  ()
@@ -373,23 +379,23 @@ Projects: 1 found
   Project 1: SmartLearn Educational Platform (Draft) - $1200000.00
 
 --- Processing: tech-spec.md ---
-2025/07/19 04:21:11 INFO Extraction completed successfully type=main.ExtractionRequest
+2025/07/19 05:58:04 INFO Extraction completed successfully type=main.ExtractionRequest
 Organisation: TechCorp Inc (Type: Technical Specification)
 Financials: Revenue $0.00, Budget $500000.00
 Contact: John Doe (john.doe@company.com)
 Projects: 1 found
-  Project 1: Advanced AI Development Platform (In progress) - $500000.00
+  Project 1: Advanced AI Development Platform (High) - $500000.00
 
 === Rich Explain Example ===
 Execution Plan Analysis:
-2025/07/19 04:21:11 INFO Dry run completed prompt_calls=4 total_input_tokens=708 total_output_tokens=245 models_used=2
+2025/07/19 05:58:04 INFO Dry run completed prompt_calls=4 total_input_tokens=708 total_output_tokens=245 models_used=2
 Unstructor Execution Plan (estimated costs)
-SchemaAnalysis (cost=24.6, tokens(in=10), fields=[organisation.name organisation.docType organisation.revenue organisation.budget organisation.contact.name organisation.contact.email organisation.contact.phone organisation.projects.name organisation.projects.status organisation.projects.budget])
-  ├─ PromptCall "basic" (model=gemini-1.5-flash, cost=4.6, tokens(in=164,out=49), fields=[organisation.name organisation.docType])
+SchemaAnalysis (cost=24.6, tokens(in=10), fields=[organisation.revenue organisation.budget organisation.contact.name organisation.contact.email organisation.contact.phone organisation.projects.name organisation.projects.status organisation.projects.budget organisation.name organisation.docType])
   ├─ PromptCall "financial" (model=gemini-1.5-pro, cost=4.7, tokens(in=171,out=54), fields=[organisation.revenue organisation.budget])
   ├─ PromptCall "contact" (model=gemini-1.5-pro, cost=4.8, tokens(in=183,out=71), fields=[organisation.contact.name organisation.contact.email organisation.contact.phone])
   ├─ PromptCall "projects" (model=gemini-1.5-flash, cost=4.9, tokens(in=190,out=71), fields=[organisation.projects.name organisation.projects.status organisation.projects.budget])
-  └─ MergeFragments (cost=1.5, fields=[organisation.name organisation.docType organisation.revenue organisation.budget organisation.contact.name organisation.contact.email organisation.contact.phone organisation.projects.name organisation.projects.status organisation.projects.budget])
+  ├─ PromptCall "basic" (model=gemini-1.5-flash, cost=4.6, tokens(in=164,out=49), fields=[organisation.name organisation.docType])
+  └─ MergeFragments (cost=1.5, fields=[organisation.revenue organisation.budget organisation.contact.name organisation.contact.email organisation.contact.phone organisation.projects.name organisation.projects.status organisation.projects.budget organisation.name organisation.docType])
 
 
 Parameter Details:
@@ -404,7 +410,7 @@ Field Inheritance:
 • Query parameters (temperature=0.2, topK=40) applied to contact extraction
 
 === Dry Run Example ===
-2025/07/19 04:21:11 INFO Dry run completed prompt_calls=4 total_input_tokens=389 total_output_tokens=245 models_used=2
+2025/07/19 05:58:04 INFO Dry run completed prompt_calls=4 total_input_tokens=389 total_output_tokens=245 models_used=2
 Cost Estimation:
 • Prompt calls: 4
 • Input tokens: 389
@@ -415,14 +421,14 @@ Cost Estimation:
 ```bash
 ➜  genkit-unstract git:(main) ✗ just do openai_and_gemini run
 go run main.go
-Multi-Model Extraction Example
+Extraction Example
 ==============================
 Demonstrating different Gemini models with varied parameters
 Note: For OpenAI integration, see the openai example
 
 Creating Google GenAI client...
 
-=== Multi-Model Company Analysis ===
+=== Company Analysis ===
 2025/07/19 05:20:39 Error extracting company data: merge "financial": financials: json: cannot unmarshal string into Go struct field .growth_rate of type float64
 
 === Model Selection Strategy ===

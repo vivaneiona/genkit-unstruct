@@ -2,6 +2,8 @@ package unstruct
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewURLStyleSyntax(t *testing.T) {
@@ -59,12 +61,8 @@ func TestNewURLStyleSyntax(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			result := parseUnstructTag(tc.tag, tc.inheritedPrompt)
-			if result.prompt != tc.expectedPrompt {
-				t.Errorf("Tag %q: Expected prompt '%s', got '%s'", tc.tag, tc.expectedPrompt, result.prompt)
-			}
-			if result.model != tc.expectedModel {
-				t.Errorf("Tag %q: Expected model '%s', got '%s'", tc.tag, tc.expectedModel, result.model)
-			}
+			assert.Equal(t, tc.expectedPrompt, result.prompt, "Tag %q: prompt mismatch", tc.tag)
+			assert.Equal(t, tc.expectedModel, result.model, "Tag %q: model mismatch", tc.tag)
 		})
 	}
 }

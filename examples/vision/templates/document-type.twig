@@ -2,7 +2,7 @@ Analyze this document image (File URI: {{ fileURI }}) and identify:
 1. The type of document (invoice, receipt, contract, form, etc.)
 2. The document date
 
-Extract the following fields: {{ Keys|join(', ') }}
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 Focus on document headers, titles, and date stamps.
 Return as JSON object with the exact field names from the Keys list.
 

@@ -1,7 +1,7 @@
 Extract customer/buyer information from this document (File URI: {{ fileURI }}):
 
 Look for the recipient information (usually labeled as "Bill To", "Customer", or on the right side).
-Extract the following fields: {{ Keys|join(', ') }}
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 Focus on: customer names, billing/shipping addresses, contact info
 
 Return as JSON object with "customer" field containing nested object with name, address, phone, and email.
