@@ -12,9 +12,14 @@ mod? do 'examples/.justfile'
 all:
     tidy vet test build
 
+# Verify dependencies
+verify:
+    go mod download
+    go mod verify
+
 # Run Go tests
 test:
-    go test -v ./...
+    go test -v -race -coverprofile=coverage.out ./...
 
 # Build the module
 build:

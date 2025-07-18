@@ -30,22 +30,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
     
-    - name: Download dependencies
-      run: go mod download
+    - name: Install just
+      uses: extractions/setup-just@v2
     
     - name: Verify dependencies
-      run: go mod verify
+      run: just verify
     
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./...
-    
-    - name: Generate coverage report
-      run: go tool cover -html=coverage.out -o coverage.html
-    
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report-go${{ matrix.go-version }}
-        path: |
-          coverage.out
-          coverage.html
+      run: just test
