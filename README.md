@@ -64,10 +64,10 @@ func main() {
     
     // Prompt templates (alternatively use Twig templates)
     prompts := unstruct.SimplePromptProvider{
-        "basic":     "Extract basic info: {{.Keys}} from: {{.Document}}. Return JSON with exact field structure.",
-        "financial": "Find financial data ({{.Keys}}) in: {{.Document}}. Return numeric values only (e.g., 2500000 for $2.5M). Use exact JSON structure.",
-        "contact":   "Extract contact details ({{.Keys}}) from: {{.Document}}. Return JSON with exact field structure.",
-        "projects":  "List all projects with {{.Keys}} from: {{.Document}}. Return budget as numeric values only (e.g., 500000 for $500K). Use exact JSON structure.",
+        "basic":     "Extract basic info: {{.Keys}}. Return JSON with exact field structure.",
+        "financial": "Find financial data ({{.Keys}}). Return numeric values only (e.g., 2500000 for $2.5M). Use exact JSON structure.",
+        "contact":   "Extract contact details ({{.Keys}}). Return JSON with exact field structure.",
+        "projects":  "List all projects with {{.Keys}}. Return budget as numeric values only (e.g., 500000 for $500K). Use exact JSON structure.",
     }
     
     // Create extractor
@@ -104,7 +104,8 @@ func main() {
 2. Makes 4 concurrent API calls instead of 8 individual ones
 3. Uses different models optimized for each data type
 4. Processes multiple content types (text, PDF, image) simultaneously
-5. Merges JSON fragments into a strongly-typed struct
+5. Automatically includes asset content (files, images, text) in AI messages
+6. Merges JSON fragments into a strongly-typed struct
 
 ## Installation
 
@@ -228,9 +229,9 @@ Focus on identifying:
 Extract these specific fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
 
 Return as JSON with exact field names.
-
-Document: {{ Document }}
 ```
+
+**Note:** When using assets (files, images, text), the document content is automatically added to the AI message. You don't need to include `Document: {{ Document }}` in your templates - the assets are passed directly to the model alongside your prompt.
 
 ```go
 // Use Twig template engine
