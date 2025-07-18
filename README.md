@@ -366,12 +366,3 @@ Estimated prompt calls: 2
 Estimated input tokens: 238
 Estimated output tokens: 147
 ```
-
-## Features
-
-- Tag-driven extraction with prompts and models declared in struct tags
-- Automatic batching of fields with the same prompt into single API calls
-- Concurrent execution of different prompt groups
-- Multi-modal support for text, images, PDFs, and mixed content
-- Type safety with strongly-typed struct outputs
-- Cost optimization with token estimation and dry-run capabilities
