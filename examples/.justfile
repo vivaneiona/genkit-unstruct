@@ -14,3 +14,5 @@ mod? openai 'openai/.justfile'
 mod? vertexai 'vertexai/.justfile'
 mod? groups 'groups/.justfile'
 mod? explain 'explain/.justfile'
+mod? custom_config 'temporal/.justfile'
+

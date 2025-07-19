@@ -59,6 +59,21 @@
 //		WithPromptConfig(promptConfig).
 //		ExplainWithCosts(pricing)
 //
+// # Custom Field Type Configuration
+//
+// Customize token estimates for specific field types:
+//
+//	fieldTypeConfig := map[string]FieldTypeConfig{
+//		"bio":        {ComplexField, 300, 80},
+//		"nickname":   {SimpleField, 60, 8},
+//		"website":    {MediumField, 100, 25},
+//	}
+//
+//	plan, err := NewPlanBuilder().
+//		WithSchema(schema).
+//		WithFieldTypeConfig(fieldTypeConfig).
+//		Explain()
+//
 // # Dry-Run Execution
 //
 // For more accurate plans, use dry-run execution with an actual Unstructor:
@@ -91,7 +106,55 @@ import (
 	"strings"
 )
 
-// Token estimation constants
+// TokenEstimationConfig holds configurable token estimation parameters.
+type TokenEstimationConfig struct {
+	CharsPerToken      int     // Average characters per token for English text
+	TokensPerWordRatio float64 // Average tokens per word
+	BasePromptTokens   int     // Base tokens for prompt template
+	DocumentTokens     int     // Tokens for document context
+	SchemaBaseTokens   int     // Base overhead for schema analysis
+	TokensPerField     int     // Additional tokens per field in schema
+}
+
+// CostCalculationConfig holds configurable cost calculation parameters.
+type CostCalculationConfig struct {
+	SchemaAnalysisBaseCost float64 // Base cost for schema analysis
+	SchemaAnalysisPerField float64 // Additional cost per field
+	PromptCallBaseCost     float64 // Base cost for prompt calls
+	PromptCallTokenFactor  float64 // Cost factor per input token
+	MergeFragmentsBaseCost float64 // Base cost for merging
+	MergeFragmentsPerField float64 // Additional cost per field
+	TransformCost          float64 // Cost for transformations
+	DefaultNodeCost        float64 // Default cost for unknown types
+}
+
+// DefaultTokenEstimationConfig returns the default token estimation configuration.
+func DefaultTokenEstimationConfig() TokenEstimationConfig {
+	return TokenEstimationConfig{
+		CharsPerToken:      4,   // Average characters per token for English text
+		TokensPerWordRatio: 1.3, // Average tokens per word
+		BasePromptTokens:   50,  // Base tokens for prompt template
+		DocumentTokens:     200, // Tokens for document context
+		SchemaBaseTokens:   20,  // Base overhead for schema analysis
+		TokensPerField:     5,   // Additional tokens per field in schema
+	}
+}
+
+// DefaultCostCalculationConfig returns the default cost calculation configuration.
+func DefaultCostCalculationConfig() CostCalculationConfig {
+	return CostCalculationConfig{
+		SchemaAnalysisBaseCost: 1.0,  // Base cost for schema analysis
+		SchemaAnalysisPerField: 0.5,  // Additional cost per field
+		PromptCallBaseCost:     3.0,  // Base cost for prompt calls
+		PromptCallTokenFactor:  0.01, // Cost factor per input token
+		MergeFragmentsBaseCost: 0.5,  // Base cost for merging
+		MergeFragmentsPerField: 0.1,  // Additional cost per field
+		TransformCost:          1.5,  // Cost for transformations
+		DefaultNodeCost:        1.0,  // Default cost for unknown types
+	}
+}
+
+// Token estimation constants (kept for backward compatibility)
 const (
 	CharsPerToken      = 4   // Average characters per token for English text
 	TokensPerWordRatio = 1.3 // Average tokens per word
@@ -101,7 +164,7 @@ const (
 	TokensPerField     = 5   // Additional tokens per field in schema
 )
 
-// Cost calculation constants
+// Cost calculation constants (kept for backward compatibility)
 const (
 	SchemaAnalysisBaseCost = 1.0  // Base cost for schema analysis
 	SchemaAnalysisPerField = 0.5  // Additional cost per field
@@ -147,12 +210,15 @@ const (
 	ComplexField                      // Complex fields like address, description
 )
 
-// Field type configuration
-var fieldTypeConfig = map[string]struct {
-	category     FieldCategory
-	inputTokens  int
-	outputTokens int
-}{
+// FieldTypeConfig represents configuration for a specific field type
+type FieldTypeConfig struct {
+	Category     FieldCategory `json:"category"`
+	InputTokens  int           `json:"inputTokens"`
+	OutputTokens int           `json:"outputTokens"`
+}
+
+// Default field type configuration
+var defaultFieldTypeConfig = map[string]FieldTypeConfig{
 	"name":        {SimpleField, 100, 20},
 	"age":         {SimpleField, 80, 10},
 	"email":       {MediumField, 90, 25},
@@ -165,6 +231,17 @@ var fieldTypeConfig = map[string]struct {
 	"date":        {SimpleField, 85, 12},
 }
 
+// DefaultFieldTypeConfig returns a copy of the default field type configuration.
+// Users can modify this map to customize token estimates for their specific use case.
+func DefaultFieldTypeConfig() map[string]FieldTypeConfig {
+	// Return a copy to prevent modifications to the original
+	config := make(map[string]FieldTypeConfig, len(defaultFieldTypeConfig))
+	for k, v := range defaultFieldTypeConfig {
+		config[k] = v
+	}
+	return config
+}
+
 // Default token estimates for unknown field types
 const (
 	DefaultInputTokens  = 100
@@ -174,13 +251,34 @@ const (
 
 // Helper functions for common operations
 
-// getFieldTokenEstimates returns input and output token estimates for a field
+// getFieldTokenEstimates returns input and output token estimates for a field using default configuration
 func getFieldTokenEstimates(fieldName string) (int, int) {
 	fieldKey := strings.ToLower(fieldName)
-	if config, exists := fieldTypeConfig[fieldKey]; exists {
-		return config.inputTokens, config.outputTokens
+	if config, exists := defaultFieldTypeConfig[fieldKey]; exists {
+		return config.InputTokens, config.OutputTokens
 	}
 	return DefaultInputTokens, DefaultOutputTokens
+}
+
+// getFieldTokenEstimatesWithConfig returns input and output token estimates for a field using custom configuration
+func getFieldTokenEstimatesWithConfig(fieldName string, fieldConfig map[string]FieldTypeConfig) (int, int) {
+	fieldKey := strings.ToLower(fieldName)
+	if config, exists := fieldConfig[fieldKey]; exists {
+		return config.InputTokens, config.OutputTokens
+	}
+	// Fallback to default configuration
+	if config, exists := defaultFieldTypeConfig[fieldKey]; exists {
+		return config.InputTokens, config.OutputTokens
+	}
+	return DefaultInputTokens, DefaultOutputTokens
+}
+
+// getFieldTokenEstimatesForBuilder returns input and output token estimates using the builder's configuration
+func (pb *PlanBuilder) getFieldTokenEstimatesForBuilder(fieldName string) (int, int) {
+	if pb.fieldTypeConfig != nil {
+		return getFieldTokenEstimatesWithConfig(fieldName, pb.fieldTypeConfig)
+	}
+	return getFieldTokenEstimates(fieldName)
 }
 
 // extractUniqueStrings extracts unique strings from a slice
@@ -282,11 +380,14 @@ const (
 // PlanBuilder is responsible for constructing execution plans.
 // Note: PlanBuilder is not thread-safe. Create separate instances for concurrent use.
 type PlanBuilder struct {
-	schema       interface{}
-	promptConfig map[string]interface{}
-	modelConfig  map[string]string
-	unstructor   interface{} // Generic unstructor for dry-run execution
-	document     string      // Sample document for token estimation
+	schema          interface{}
+	promptConfig    map[string]interface{}
+	modelConfig     map[string]string
+	fieldTypeConfig map[string]FieldTypeConfig // Custom field type configurations
+	unstructor      interface{}                // Generic unstructor for dry-run execution
+	document        string                     // Sample document for token estimation
+	tokenConfig     *TokenEstimationConfig
+	costConfig      *CostCalculationConfig
 }
 
 // NewPlanBuilder creates a new plan builder.
@@ -311,6 +412,18 @@ func (pb *PlanBuilder) WithPromptConfig(config map[string]interface{}) *PlanBuil
 		cloned[k] = v
 	}
 	pb.promptConfig = cloned
+	return pb
+}
+
+// WithFieldTypeConfig sets custom field type configurations.
+// This allows users to customize token estimates for specific field types.
+func (pb *PlanBuilder) WithFieldTypeConfig(config map[string]FieldTypeConfig) *PlanBuilder {
+	// Clone the map to avoid shared mutable state
+	cloned := make(map[string]FieldTypeConfig, len(config))
+	for k, v := range config {
+		cloned[k] = v
+	}
+	pb.fieldTypeConfig = cloned
 	return pb
 }
 
@@ -570,9 +683,10 @@ func (pb *PlanBuilder) validateFields(fields []string) ([]string, error) {
 	return fields, nil
 }
 
-// estimateSchemaTokens estimates the token count for schema analysis using constants.
+// estimateSchemaTokens estimates the token count for schema analysis using configuration.
 func (pb *PlanBuilder) estimateSchemaTokens(fields []string) int {
-	return SchemaBaseTokens + len(fields)*TokensPerField
+	tokenConfig := pb.getTokenConfig()
+	return tokenConfig.SchemaBaseTokens + len(fields)*tokenConfig.TokensPerField
 }
 
 // createPromptCallNode creates a PromptCall node for a specific field.
@@ -623,13 +737,14 @@ func (pb *PlanBuilder) getModelForField(field string) string {
 
 // estimatePromptTokens estimates the input token count for a prompt using field configuration.
 func (pb *PlanBuilder) estimatePromptTokens(field string) int {
-	fieldTokens, _ := getFieldTokenEstimates(field)
-	return BasePromptTokens + fieldTokens + DocumentTokens
+	tokenConfig := pb.getTokenConfig()
+	fieldTokens, _ := pb.getFieldTokenEstimatesForBuilder(field)
+	return tokenConfig.BasePromptTokens + fieldTokens + tokenConfig.DocumentTokens
 }
 
 // estimateOutputTokens estimates the output token count for a prompt using field configuration.
 func (pb *PlanBuilder) estimateOutputTokens(field string) int {
-	_, outputTokens := getFieldTokenEstimates(field)
+	_, outputTokens := pb.getFieldTokenEstimatesForBuilder(field)
 	return outputTokens
 }
 
@@ -687,19 +802,20 @@ func (pb *PlanBuilder) populateSummaryInfo(rootNode *PlanNode) {
 	rootNode.ExpectedCallCounts = callCounts
 }
 
-// calculateNodeCost calculates the abstract cost for a single node using constants.
+// calculateNodeCost calculates the abstract cost for a single node using configuration.
 func (pb *PlanBuilder) calculateNodeCost(node *PlanNode) float64 {
+	costConfig := pb.getCostConfig()
 	switch node.Type {
 	case SchemaAnalysisType:
-		return SchemaAnalysisBaseCost + float64(len(node.Fields))*SchemaAnalysisPerField
+		return costConfig.SchemaAnalysisBaseCost + float64(len(node.Fields))*costConfig.SchemaAnalysisPerField
 	case PromptCallType:
-		return PromptCallBaseCost + float64(node.InputTokens)*PromptCallTokenFactor
+		return costConfig.PromptCallBaseCost + float64(node.InputTokens)*costConfig.PromptCallTokenFactor
 	case MergeFragmentsType:
-		return MergeFragmentsBaseCost + float64(len(node.Fields))*MergeFragmentsPerField
+		return costConfig.MergeFragmentsBaseCost + float64(len(node.Fields))*costConfig.MergeFragmentsPerField
 	case TransformType:
-		return TransformCost
+		return costConfig.TransformCost
 	default:
-		return DefaultNodeCost
+		return costConfig.DefaultNodeCost
 	}
 }
 
@@ -768,4 +884,46 @@ func EstimateTokensFromText(text string) int {
 // EstimateTokensFromWords provides a rough token estimate from word count using constants.
 func EstimateTokensFromWords(wordCount int) int {
 	return int(math.Ceil(float64(wordCount) * TokensPerWordRatio))
+}
+
+// WithTokenConfig sets custom token estimation configuration.
+// If not set, default token estimation constants will be used.
+func (pb *PlanBuilder) WithTokenConfig(config TokenEstimationConfig) *PlanBuilder {
+	pb.tokenConfig = &config
+	return pb
+}
+
+// WithCostConfig sets custom cost calculation configuration.
+// If not set, default cost calculation constants will be used.
+func (pb *PlanBuilder) WithCostConfig(config CostCalculationConfig) *PlanBuilder {
+	pb.costConfig = &config
+	return pb
+}
+
+// getTokenConfig returns the token configuration, using defaults if not set.
+func (pb *PlanBuilder) getTokenConfig() TokenEstimationConfig {
+	if pb.tokenConfig != nil {
+		return *pb.tokenConfig
+	}
+	return DefaultTokenEstimationConfig()
+}
+
+// getCostConfig returns the cost configuration, using defaults if not set.
+func (pb *PlanBuilder) getCostConfig() CostCalculationConfig {
+	if pb.costConfig != nil {
+		return *pb.costConfig
+	}
+	return DefaultCostCalculationConfig()
+}
+
+// EstimateTokensFromTextCustom provides a token estimate using the builder's token configuration.
+func (pb *PlanBuilder) EstimateTokensFromTextCustom(text string) int {
+	tokenConfig := pb.getTokenConfig()
+	return (len(text) + tokenConfig.CharsPerToken - 1) / tokenConfig.CharsPerToken
+}
+
+// EstimateTokensFromWordsCustom provides a token estimate using the builder's token configuration.
+func (pb *PlanBuilder) EstimateTokensFromWordsCustom(wordCount int) int {
+	tokenConfig := pb.getTokenConfig()
+	return int(math.Ceil(float64(wordCount) * tokenConfig.TokensPerWordRatio))
 }
