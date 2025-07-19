@@ -11,6 +11,7 @@ import (
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
+	"google.golang.org/genai"
 )
 
 // DocumentRequest represents a document processing request with file URI-based content sources
@@ -181,6 +182,176 @@ func getRequestType(req DocumentRequest) string {
 	return "unknown"
 }
 
+// Helper functions to reduce code duplication
+
+// createGenAIClientFromEnv creates a GenAI client using the GEMINI_API_KEY environment variable
+func createGenAIClientFromEnv(ctx context.Context, logger interface{ Error(string, ...interface{}) }) (*genai.Client, error) {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		logger.Error("Missing required environment variable", "variable", "GEMINI_API_KEY")
+		return nil, fmt.Errorf("GEMINI_API_KEY not set")
+	}
+
+	client, err := CreateDefaultGenAIClient(ctx, apiKey)
+	if err != nil {
+		logger.Error("Failed to create GenAI client", "error", err.Error())
+		return nil, fmt.Errorf("failed to create GenAI client: %w", err)
+	}
+
+	return client, nil
+}
+
+// createAssetsFromRequest creates unstruct.Asset slice from DocumentRequest
+func createAssetsFromRequest(ctx context.Context, req DocumentRequest, client *genai.Client, logger interface {
+	Error(string, ...interface{})
+	Info(string, ...interface{})
+}, purposePrefix string) ([]unstruct.Asset, error) {
+	if req.ContentURI == "" {
+		logger.Error("Invalid request: missing content URI")
+		return nil, fmt.Errorf("ContentURI must be provided with file:// scheme")
+	}
+
+	// Handle modern URI-based content
+	parsedURL, err := url.Parse(req.ContentURI)
+	if err != nil {
+		logger.Error("Failed to parse content URI", "uri", req.ContentURI, "error", err.Error())
+		return nil, fmt.Errorf("invalid content URI: %w", err)
+	}
+
+	switch parsedURL.Scheme {
+	case "file":
+		// Extract file path from file:// URI
+		filePath := parsedURL.Path
+		// Remove leading slash for relative paths
+		if len(filePath) > 0 && filePath[0] == '/' {
+			filePath = filePath[1:]
+		}
+
+		logger.Info("Processing file URI",
+			"file_path", filePath,
+			"original_uri", req.ContentURI,
+			"parsed_path", parsedURL.Path,
+		)
+
+		displayName := req.DisplayName
+		if displayName == "" {
+			displayName = fmt.Sprintf("%s - %s", purposePrefix, filePath)
+		}
+
+		return []unstruct.Asset{
+			unstruct.NewFileAsset(
+				client,
+				filePath,
+				unstruct.WithDisplayName(displayName),
+			),
+		}, nil
+
+	case "data":
+		// Handle data: URIs for inline content (not used in this file-only version)
+		logger.Error("Data URIs not supported in file-only mode", "uri", req.ContentURI)
+		return nil, fmt.Errorf("data URIs not supported in file-only mode")
+
+	default:
+		logger.Error("Unsupported URI scheme", "scheme", parsedURL.Scheme, "uri", req.ContentURI)
+		return nil, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
+	}
+}
+
+// extractSectionData performs extraction for a specific section type
+func extractSectionData(ctx context.Context, section string, model string, assets []unstruct.Asset, client *genai.Client, logger interface {
+	Error(string, ...interface{})
+}) (map[string]interface{}, error) {
+	switch section {
+	case "basic":
+		type BasicInfo struct {
+			Title   string `json:"title"`
+			Author  string `json:"author"`
+			DocType string `json:"doc_type"`
+			Date    string `json:"date"`
+		}
+
+		extractor := unstruct.New[BasicInfo](client, Prompts)
+		result, err := extractor.Unstruct(ctx, assets, unstruct.WithModel(model), unstruct.WithTimeout(2*time.Minute))
+		if err != nil {
+			logger.Error("Basic section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("basic section extraction failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"title":    result.Title,
+			"author":   result.Author,
+			"doc_type": result.DocType,
+			"date":     result.Date,
+		}, nil
+
+	case "financial":
+		type FinancialInfo struct {
+			Budget   float64 `json:"budget"`
+			Currency string  `json:"currency"`
+		}
+
+		extractor := unstruct.New[FinancialInfo](client, Prompts)
+		result, err := extractor.Unstruct(ctx, assets, unstruct.WithModel(model), unstruct.WithTimeout(2*time.Minute))
+		if err != nil {
+			logger.Error("Financial section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("financial section extraction failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"budget":   result.Budget,
+			"currency": result.Currency,
+		}, nil
+
+	case "project":
+		type ProjectInfo struct {
+			Code      string `json:"code"`
+			Status    string `json:"status"`
+			TeamSize  int    `json:"team_size"`
+			StartDate string `json:"start_date"`
+			EndDate   string `json:"end_date"`
+		}
+
+		extractor := unstruct.New[ProjectInfo](client, Prompts)
+		result, err := extractor.Unstruct(ctx, assets, unstruct.WithModel(model), unstruct.WithTimeout(2*time.Minute))
+		if err != nil {
+			logger.Error("Project section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("project section extraction failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"code":       result.Code,
+			"status":     result.Status,
+			"team_size":  result.TeamSize,
+			"start_date": result.StartDate,
+			"end_date":   result.EndDate,
+		}, nil
+
+	case "contact":
+		type ContactInfo struct {
+			Name  string `json:"name"`
+			Email string `json:"email"`
+			Phone string `json:"phone"`
+		}
+
+		extractor := unstruct.New[ContactInfo](client, Prompts)
+		result, err := extractor.Unstruct(ctx, assets, unstruct.WithModel(model), unstruct.WithTimeout(2*time.Minute))
+		if err != nil {
+			logger.Error("Contact section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("contact section extraction failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"name":  result.Name,
+			"email": result.Email,
+			"phone": result.Phone,
+		}, nil
+
+	default:
+		logger.Error("Unsupported section for extraction", "section", section)
+		return nil, fmt.Errorf("unsupported section: %s", section)
+	}
+}
+
 // ExtractDocumentDataActivity performs the actual document extraction
 func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (ExtractionTarget, error) {
 	logger := activity.GetLogger(ctx)
@@ -197,19 +368,10 @@ func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (Extr
 		"content_uri", req.ContentURI,
 	)
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		logger.Error("Missing required environment variable", "variable", "GEMINI_API_KEY")
-		return ExtractionTarget{}, fmt.Errorf("GEMINI_API_KEY not set")
-	}
-
-	logger.Info("Environment validated", "gemini_api_key_set", true)
-
-	// Create GenAI client
-	client, err := CreateDefaultGenAIClient(ctx, apiKey)
+	// Create GenAI client using helper function
+	client, err := createGenAIClientFromEnv(ctx, logger)
 	if err != nil {
-		logger.Error("Failed to create GenAI client", "error", err.Error())
-		return ExtractionTarget{}, fmt.Errorf("failed to create GenAI client: %w", err)
+		return ExtractionTarget{}, err
 	}
 
 	logger.Info("GenAI client created successfully")
@@ -218,58 +380,10 @@ func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (Extr
 	extractor := unstruct.New[ExtractionTarget](client, Prompts)
 	logger.Info("Unstruct extractor initialized")
 
-	// Create assets based on input type
-	var assets []unstruct.Asset
-
-	if req.ContentURI != "" {
-		// Handle modern URI-based content
-		parsedURL, err := url.Parse(req.ContentURI)
-		if err != nil {
-			logger.Error("Failed to parse content URI", "uri", req.ContentURI, "error", err.Error())
-			return ExtractionTarget{}, fmt.Errorf("invalid content URI: %w", err)
-		}
-
-		switch parsedURL.Scheme {
-		case "file":
-			// Extract file path from file:// URI
-			filePath := parsedURL.Path
-			// Remove leading slash for relative paths
-			if len(filePath) > 0 && filePath[0] == '/' {
-				filePath = filePath[1:]
-			}
-
-			logger.Info("Processing file URI",
-				"file_path", filePath,
-				"original_uri", req.ContentURI,
-				"parsed_path", parsedURL.Path,
-			)
-
-			displayName := req.DisplayName
-			if displayName == "" {
-				displayName = fmt.Sprintf("Temporal Document Processing - %s", filePath)
-			}
-
-			assets = []unstruct.Asset{
-				unstruct.NewFileAsset(
-					client,
-					filePath,
-					unstruct.WithDisplayName(displayName),
-				),
-			}
-
-		case "data":
-			// Handle data: URIs for inline content (not used in this file-only version)
-			logger.Error("Data URIs not supported in file-only mode", "uri", req.ContentURI)
-			return ExtractionTarget{}, fmt.Errorf("data URIs not supported in file-only mode")
-
-		default:
-			logger.Error("Unsupported URI scheme", "scheme", parsedURL.Scheme, "uri", req.ContentURI)
-			return ExtractionTarget{}, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
-		}
-
-	} else {
-		logger.Error("Invalid request: missing content URI")
-		return ExtractionTarget{}, fmt.Errorf("ContentURI must be provided with file:// scheme")
+	// Create assets using helper function
+	assets, err := createAssetsFromRequest(ctx, req, client, logger, "Temporal Document Processing")
+	if err != nil {
+		return ExtractionTarget{}, err
 	}
 
 	logger.Info("Assets prepared for extraction", "asset_count", len(assets))
@@ -322,62 +436,21 @@ func DryRunActivity(ctx context.Context, req DocumentRequest) (map[string]interf
 		"request_type", getRequestType(req),
 	)
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		logger.Error("Missing required environment variable", "variable", "GEMINI_API_KEY")
-		return nil, fmt.Errorf("GEMINI_API_KEY not set")
-	}
-
-	// Create GenAI client
-	client, err := CreateDefaultGenAIClient(ctx, apiKey)
+	// Create GenAI client using helper function
+	client, err := createGenAIClientFromEnv(ctx, logger)
 	if err != nil {
-		logger.Error("Failed to create GenAI client", "error", err.Error())
-		return nil, fmt.Errorf("failed to create GenAI client: %w", err)
+		return nil, err
 	}
 
 	logger.Info("GenAI client created for dry run")
 
 	// Create extractor
 	extractor := unstruct.New[ExtractionTarget](client, Prompts)
-	// Create assets based on input type
-	assets := []unstruct.Asset{}
-	// Handle modern URI-based content
-	parsedURL, err := url.Parse(req.ContentURI)
+
+	// Create assets using helper function
+	assets, err := createAssetsFromRequest(ctx, req, client, logger, "Dry Run")
 	if err != nil {
-		logger.Error("Failed to parse content URI for dry run", "uri", req.ContentURI, "error", err.Error())
-		return nil, fmt.Errorf("invalid content URI: %w", err)
-	}
-
-	switch parsedURL.Scheme {
-	case "file":
-		// Extract file path from file:// URI
-		filePath := parsedURL.Path
-		// Remove leading slash for relative paths
-		if len(filePath) > 0 && filePath[0] == '/' {
-			filePath = filePath[1:]
-		}
-
-		logger.Info("Processing file URI for dry run",
-			"file_path", filePath,
-			"original_uri", req.ContentURI,
-		)
-
-		displayName := req.DisplayName
-		if displayName == "" {
-			displayName = fmt.Sprintf("Dry Run - %s", filePath)
-		}
-
-		assets = append(assets,
-			unstruct.NewFileAsset(
-				client,
-				filePath,
-				unstruct.WithDisplayName(displayName),
-			),
-		)
-
-	default:
-		logger.Error("Unsupported URI scheme for dry run", "scheme", parsedURL.Scheme, "uri", req.ContentURI)
-		return nil, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
+		return nil, err
 	}
 
 	// Perform dry run
@@ -430,65 +503,19 @@ func ExtractSectionActivity(ctx context.Context, req ExtractionRequest) (map[str
 		"display_name", req.Request.DisplayName,
 	)
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		logger.Error("Missing required environment variable", "variable", "GEMINI_API_KEY")
-		return nil, fmt.Errorf("GEMINI_API_KEY not set")
-	}
-
-	logger.Info("Environment validated", "gemini_api_key_set", true)
-
-	// Create GenAI client
-	client, err := CreateDefaultGenAIClient(ctx, apiKey)
+	// Create GenAI client using helper function
+	client, err := createGenAIClientFromEnv(ctx, logger)
 	if err != nil {
-		logger.Error("Failed to create GenAI client", "error", err.Error())
-		return nil, fmt.Errorf("failed to create GenAI client: %w", err)
+		return nil, err
 	}
 
 	logger.Info("GenAI client created successfully")
 
-	// Create assets based on input type
-	var assets []unstruct.Asset
-
-	if req.Request.ContentURI != "" {
-		// Handle modern URI-based content
-		parsedURL, err := url.Parse(req.Request.ContentURI)
-		if err != nil {
-			logger.Error("Failed to parse content URI", "uri", req.Request.ContentURI, "error", err.Error())
-			return nil, fmt.Errorf("invalid content URI: %w", err)
-		}
-
-		switch parsedURL.Scheme {
-		case "file":
-			// Extract file path from file:// URI
-			filePath := parsedURL.Path
-			logger.Info("Processing file URI for section extraction",
-				"file_path", filePath,
-				"original_uri", req.Request.ContentURI,
-				"section", req.Section,
-			)
-
-			displayName := req.Request.DisplayName
-			if displayName == "" {
-				displayName = fmt.Sprintf("Temporal Section Processing - %s - %s", req.Section, filePath)
-			}
-
-			assets = []unstruct.Asset{
-				unstruct.NewFileAsset(
-					client,
-					filePath,
-					unstruct.WithDisplayName(displayName),
-				),
-			}
-
-		default:
-			logger.Error("Unsupported URI scheme for section extraction", "scheme", parsedURL.Scheme, "uri", req.Request.ContentURI)
-			return nil, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
-		}
-
-	} else {
-		logger.Error("Invalid request: missing content URI for section extraction")
-		return nil, fmt.Errorf("ContentURI must be provided with file:// scheme")
+	// Create assets using helper function
+	purposePrefix := fmt.Sprintf("Temporal Section Processing - %s", req.Section)
+	assets, err := createAssetsFromRequest(ctx, req.Request, client, logger, purposePrefix)
+	if err != nil {
+		return nil, err
 	}
 
 	logger.Info("Assets prepared for section extraction", "asset_count", len(assets))
@@ -507,121 +534,10 @@ func ExtractSectionActivity(ctx context.Context, req ExtractionRequest) (map[str
 		model = "gemini-1.5-flash" // Default model
 	}
 
-	// Create a typed result map for the specific section
-	var result map[string]interface{}
-
-	switch req.Section {
-	case "basic":
-		// Create a basic info extractor
-		type BasicInfo struct {
-			Title   string `json:"title"`
-			Author  string `json:"author"`
-			DocType string `json:"doc_type"`
-			Date    string `json:"date"`
-		}
-
-		basicExtractor := unstruct.New[BasicInfo](client, Prompts)
-		basicResult, err := basicExtractor.Unstruct(
-			ctx,
-			assets,
-			unstruct.WithModel(model),
-			unstruct.WithTimeout(2*time.Minute),
-		)
-		if err != nil {
-			logger.Error("Basic section extraction failed", "error", err.Error())
-			return nil, fmt.Errorf("basic section extraction failed: %w", err)
-		}
-
-		result = map[string]interface{}{
-			"title":    basicResult.Title,
-			"author":   basicResult.Author,
-			"doc_type": basicResult.DocType,
-			"date":     basicResult.Date,
-		}
-
-	case "financial":
-		// Create a financial info extractor
-		type FinancialInfo struct {
-			Budget   float64 `json:"budget"`
-			Currency string  `json:"currency"`
-		}
-
-		financialExtractor := unstruct.New[FinancialInfo](client, Prompts)
-		financialResult, err := financialExtractor.Unstruct(
-			ctx,
-			assets,
-			unstruct.WithModel(model),
-			unstruct.WithTimeout(2*time.Minute),
-		)
-		if err != nil {
-			logger.Error("Financial section extraction failed", "error", err.Error())
-			return nil, fmt.Errorf("financial section extraction failed: %w", err)
-		}
-
-		result = map[string]interface{}{
-			"budget":   financialResult.Budget,
-			"currency": financialResult.Currency,
-		}
-
-	case "project":
-		// Create a project info extractor
-		type ProjectInfo struct {
-			Code      string `json:"code"`
-			Status    string `json:"status"`
-			TeamSize  int    `json:"team_size"`
-			StartDate string `json:"start_date"`
-			EndDate   string `json:"end_date"`
-		}
-
-		projectExtractor := unstruct.New[ProjectInfo](client, Prompts)
-		projectResult, err := projectExtractor.Unstruct(
-			ctx,
-			assets,
-			unstruct.WithModel(model),
-			unstruct.WithTimeout(2*time.Minute),
-		)
-		if err != nil {
-			logger.Error("Project section extraction failed", "error", err.Error())
-			return nil, fmt.Errorf("project section extraction failed: %w", err)
-		}
-
-		result = map[string]interface{}{
-			"code":       projectResult.Code,
-			"status":     projectResult.Status,
-			"team_size":  projectResult.TeamSize,
-			"start_date": projectResult.StartDate,
-			"end_date":   projectResult.EndDate,
-		}
-
-	case "contact":
-		// Create a contact info extractor
-		type ContactInfo struct {
-			Name  string `json:"name"`
-			Email string `json:"email"`
-			Phone string `json:"phone"`
-		}
-
-		contactExtractor := unstruct.New[ContactInfo](client, Prompts)
-		contactResult, err := contactExtractor.Unstruct(
-			ctx,
-			assets,
-			unstruct.WithModel(model),
-			unstruct.WithTimeout(2*time.Minute),
-		)
-		if err != nil {
-			logger.Error("Contact section extraction failed", "error", err.Error())
-			return nil, fmt.Errorf("contact section extraction failed: %w", err)
-		}
-
-		result = map[string]interface{}{
-			"name":  contactResult.Name,
-			"email": contactResult.Email,
-			"phone": contactResult.Phone,
-		}
-
-	default:
-		logger.Error("Unsupported section for extraction", "section", req.Section)
-		return nil, fmt.Errorf("unsupported section: %s", req.Section)
+	// Extract section data using helper function
+	result, err := extractSectionData(ctx, req.Section, model, assets, client, logger)
+	if err != nil {
+		return nil, err
 	}
 
 	extractionDuration := time.Since(extractionStart)

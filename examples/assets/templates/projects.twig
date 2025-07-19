@@ -14,4 +14,18 @@ Pay attention to:
 - Budget amounts and currency
 - Project phases or stages
 
-Return as a JSON object with the exact field names from the Keys list.
+Return JSON with this exact structure format:
+{
+  "organisation": {
+    "projects": [
+      {
+        "name": "project_name",
+        "status": "status",
+        "budget": 123456
+      }
+    ]
+  }
+}
+
+Use only numeric values for budget amounts without currency symbols.
+Use the exact field names from the Keys list and ensure proper JSON formatting.

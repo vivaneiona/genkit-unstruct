@@ -1,0 +1,30 @@
+Extract contact information from this document.
+
+Look for:
+- Names of people (contacts, managers, team members)
+- Email addresses and communication details
+- Phone numbers and contact methods
+- Job titles and organizational roles
+
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+Focus on:
+- Full names of individuals
+- Professional email addresses
+- Phone numbers with proper formatting
+- Job titles and departments
+- Contact relationships and roles
+
+Return JSON with this exact structure format:
+{
+  "organisation": {
+    "contact": {
+      "name": "contact_name",
+      "email": "email@domain.com",
+      "phone": "+1-555-0123"
+    }
+  }
+}
+
+Use the exact field names from the Keys list and ensure proper JSON formatting.
+

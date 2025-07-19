@@ -1,0 +1,26 @@
+Extract financial information from this document.
+
+Look for:
+- Revenue and income figures
+- Budget and cost information
+- Financial metrics and KPIs
+- Monetary amounts and currency details
+
+Extract the following fields: {% for key in Keys %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+Pay attention to:
+- Specific monetary amounts with their currency
+- Revenue figures (annual, quarterly, monthly)
+- Budget allocations and spending
+- Financial ratios and percentages
+
+Return JSON with this exact structure format:
+{
+  "organisation": {
+    "revenue": 123456,
+    "budget": 789012
+  }
+}
+
+Use only numeric values without currency symbols in the output.
+Use the exact field names from the Keys list and ensure proper JSON formatting.
