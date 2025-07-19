@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -14,7 +15,7 @@ import (
 )
 
 func main() {
-	// Setup tinted logger with slog
+	// Set up structured logging with tinted output
 	logger := slog.New(
 		tint.NewHandler(os.Stderr, &tint.Options{
 			Level:      slog.LevelInfo,
@@ -24,8 +25,9 @@ func main() {
 	)
 	slog.SetDefault(logger)
 
-	logger.Info("Starting Temporal workflow starter for unstruct extraction demo",
+	logger.Info("Starting Temporal workflow starter for file-based unstruct extraction demo",
 		slog.String("component", "starter"),
+		slog.String("mode", "file_only"),
 	)
 
 	// Check for required environment variable
@@ -56,181 +58,131 @@ func main() {
 
 	logger.Info("Connected to Temporal server successfully")
 
-	// Test 1: Text-based extraction
-	logger.Info("Starting test case",
-		slog.String("test", "text-based document extraction"),
-		slog.Int("test_number", 1),
-	)
-
-	textInput := demo.WorkflowInput{
-		Request: demo.DocumentRequest{
-			TextContent: `
-# Research Report - Market Analysis
-
-**Author:** Dr. Emily Rodriguez  
-**Date:** February 20, 2024  
-**Department:** Research & Development  
-**Classification:** Internal Use
-
-## Executive Summary
-
-This report presents a comprehensive market analysis for our upcoming product initiatives.
-
-**Research Project Details:**
-- Project Code: RES-MARKET-2024
-- Project Name: Market Analysis Study
-- Budget: $75,000.00 EUR
-- Start Date: January 15, 2024
-- End Date: June 30, 2024
-- Status: Active
-- Priority: High
-- Project Lead: Dr. Emily Rodriguez
-- Team Size: 5
-
-## Contact Information
-- Name: Dr. Emily Rodriguez
-- Email: emily.rodriguez@company.com
-- Phone: +1-555-0123
-`,
-			DisplayName: "Text-based Research Report",
-		},
-	}
-
-	workflowID := "text-extract-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-
-	logger.Info("Executing workflow",
-		slog.String("workflow_id", workflowID),
-		slog.String("workflow_type", "DocumentExtractionWorkflow"),
-		slog.String("task_queue", "unstruct-q"),
-		slog.String("input_type", "text_content"),
-	)
-
-	resp, err := c.ExecuteWorkflow(
-		context.Background(),
-		client.StartWorkflowOptions{
-			ID:        workflowID,
-			TaskQueue: "unstruct-q",
-		},
-		demo.DocumentExtractionWorkflow,
-		textInput,
-	)
+	// Find available documents in docs/ directory
+	docsDir := "docs"
+	files, err := os.ReadDir(docsDir)
 	if err != nil {
-		logger.Error("Failed to start workflow",
-			slog.String("workflow_id", workflowID),
+		logger.Error("Failed to read docs directory",
+			slog.String("directory", docsDir),
 			slog.String("error", err.Error()),
 		)
 		os.Exit(1)
 	}
 
-	logger.Info("Workflow started, waiting for completion",
-		slog.String("workflow_id", workflowID),
-	)
+	// Filter for markdown files
+	var mdFiles []string
+	for _, file := range files {
+		if !file.IsDir() && (file.Name()[len(file.Name())-3:] == ".md") {
+			mdFiles = append(mdFiles, file.Name())
+		}
+	}
 
-	var textResult *demo.WorkflowOutput
-	err = resp.Get(context.Background(), &textResult)
-	if err != nil {
-		logger.Error("Workflow execution failed",
-			slog.String("workflow_id", workflowID),
-			slog.String("error", err.Error()),
+	if len(mdFiles) == 0 {
+		logger.Warn("No markdown files found in docs directory",
+			slog.String("directory", docsDir),
 		)
 		os.Exit(1)
 	}
 
-	logger.Info("Text extraction workflow completed",
-		slog.String("workflow_id", workflowID),
-		slog.Bool("success", textResult.Success),
-		slog.Duration("processing_time", textResult.Metadata.ProcessingTime),
-		slog.Int("model_calls", textResult.Metadata.ModelCalls),
-		slog.String("timestamp", textResult.Timestamp.Format(time.RFC3339)),
+	logger.Info("Found markdown files for processing",
+		slog.String("directory", docsDir),
+		slog.Int("file_count", len(mdFiles)),
+		slog.Any("files", mdFiles),
 	)
 
-	logger.Info("Extracted data summary",
-		slog.String("title", textResult.Data.Basic.Title),
-		slog.String("author", textResult.Data.Basic.Author),
-		slog.String("doc_type", textResult.Data.Basic.DocType),
-		slog.Float64("budget", textResult.Data.Financial.Budget),
-		slog.String("currency", textResult.Data.Financial.Currency),
-		slog.String("project_code", textResult.Data.Project.Code),
-		slog.String("project_status", textResult.Data.Project.Status),
-		slog.Int("team_size", textResult.Data.Project.TeamSize),
-		slog.String("contact_name", textResult.Data.Contact.Name),
-		slog.String("contact_email", textResult.Data.Contact.Email),
-	)
-
-	// Test 2: File-based extraction (if docs/research-report.md exists)
-	logger.Info("Starting test case",
-		slog.String("test", "file-based document extraction"),
-		slog.Int("test_number", 2),
-	)
-
-	filePath := "docs/research-report.md"
-	if _, err := os.Stat(filePath); err == nil {
-		logger.Info("File found, proceeding with file-based extraction",
-			slog.String("file_path", filePath),
+	// Process each file using file:// URI scheme
+	for i, fileName := range mdFiles {
+		logger.Info("Starting file extraction workflow",
+			slog.String("test", "file URI-based document extraction"),
+			slog.Int("test_number", i+1),
+			slog.String("file_name", fileName),
 		)
 
-		fileInput := demo.WorkflowInput{
+		// Create file:// URI
+		fileURI := &url.URL{
+			Scheme: "file",
+			Path:   docsDir + "/" + fileName,
+		}
+
+		input := demo.WorkflowInput{
 			Request: demo.DocumentRequest{
-				FilePath:    filePath,
-				DisplayName: "File-based Research Report Analysis",
+				ContentURI:  fileURI.String(),
+				DisplayName: "File URI: " + fileName,
 			},
 		}
 
-		workflowID2 := "file-extract-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+		workflowID := "file-extract-" + fileName + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
-		logger.Info("Executing file-based workflow",
-			slog.String("workflow_id", workflowID2),
-			slog.String("file_path", filePath),
+		logger.Info("Executing workflow",
+			slog.String("workflow_id", workflowID),
+			slog.String("workflow_type", "DocumentExtractionWorkflow"),
+			slog.String("task_queue", "unstruct-q"),
+			slog.String("content_uri", fileURI.String()),
+			slog.String("file_path", docsDir+"/"+fileName),
 		)
 
-		resp2, err := c.ExecuteWorkflow(
+		resp, err := c.ExecuteWorkflow(
 			context.Background(),
 			client.StartWorkflowOptions{
-				ID:        workflowID2,
+				ID:        workflowID,
 				TaskQueue: "unstruct-q",
 			},
 			demo.DocumentExtractionWorkflow,
-			fileInput,
+			input,
 		)
 		if err != nil {
-			logger.Error("Failed to start file-based workflow",
-				slog.String("workflow_id", workflowID2),
+			logger.Error("Failed to start workflow",
+				slog.String("workflow_id", workflowID),
+				slog.String("file_name", fileName),
 				slog.String("error", err.Error()),
 			)
-			os.Exit(1)
+			continue
 		}
 
-		var fileResult *demo.WorkflowOutput
-		err = resp2.Get(context.Background(), &fileResult)
+		logger.Info("Workflow started, waiting for completion",
+			slog.String("workflow_id", workflowID),
+			slog.String("file_name", fileName),
+		)
+
+		var result *demo.WorkflowOutput
+		err = resp.Get(context.Background(), &result)
 		if err != nil {
-			logger.Error("File-based workflow execution failed",
-				slog.String("workflow_id", workflowID2),
+			logger.Error("Workflow execution failed",
+				slog.String("workflow_id", workflowID),
+				slog.String("file_name", fileName),
 				slog.String("error", err.Error()),
 			)
-			os.Exit(1)
+			continue
 		}
 
 		logger.Info("File extraction workflow completed",
-			slog.String("workflow_id", workflowID2),
-			slog.Bool("success", fileResult.Success),
-			slog.Duration("processing_time", fileResult.Metadata.ProcessingTime),
-			slog.Int("model_calls", fileResult.Metadata.ModelCalls),
+			slog.String("workflow_id", workflowID),
+			slog.String("file_name", fileName),
+			slog.Bool("success", result.Success),
+			slog.Duration("processing_time", result.Metadata.ProcessingTime),
+			slog.Int("model_calls", result.Metadata.ModelCalls),
+			slog.String("timestamp", result.Timestamp.Format(time.RFC3339)),
 		)
 
-		logger.Info("File extraction data summary",
-			slog.String("title", fileResult.Data.Basic.Title),
-			slog.String("author", fileResult.Data.Basic.Author),
-			slog.String("project_code", fileResult.Data.Project.Code),
-			slog.Float64("budget", fileResult.Data.Financial.Budget),
-		)
-	} else {
-		logger.Warn("File not found, skipping file-based test",
-			slog.String("file_path", filePath),
-			slog.String("reason", "file does not exist"),
-		)
+		if result.Success {
+			logger.Info("Extracted data summary",
+				slog.String("file_name", fileName),
+				slog.String("title", result.Data.Basic.Title),
+				slog.String("author", result.Data.Basic.Author),
+				slog.String("doc_type", result.Data.Basic.DocType),
+				slog.Float64("budget", result.Data.Financial.Budget),
+				slog.String("currency", result.Data.Financial.Currency),
+				slog.String("project_code", result.Data.Project.Code),
+				slog.String("project_status", result.Data.Project.Status),
+				slog.Int("team_size", result.Data.Project.TeamSize),
+				slog.String("contact_name", result.Data.Contact.Name),
+				slog.String("contact_email", result.Data.Contact.Email),
+			)
+		}
 	}
 
-	logger.Info("Demo completed successfully",
-		slog.String("status", "all tests finished"),
+	logger.Info("File-based extraction demo completed",
+		slog.String("status", "all files processed"),
+		slog.Int("total_files", len(mdFiles)),
 	)
 }

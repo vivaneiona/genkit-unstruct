@@ -3,6 +3,7 @@ package temporal_demo
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"time"
 
@@ -12,12 +13,18 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-// DocumentRequest represents a document processing request
+// DocumentRequest represents a document processing request with file URI-based content sources
 type DocumentRequest struct {
-	// Either provide text content or file path
-	TextContent string `json:"text_content,omitempty"`
-	FilePath    string `json:"file_path,omitempty"`
+	// Content source using file:// URI scheme for local files:
+	// - "file://docs/document.md" for local markdown files
+	// - "file://docs/report.txt" for local text files
+	// Note: Only file:// scheme is supported in this file-only version
+	ContentURI  string `json:"content_uri"`
 	DisplayName string `json:"display_name,omitempty"`
+
+	// Legacy fields for backward compatibility (deprecated - use ContentURI instead)
+	TextContent string `json:"text_content,omitempty"` // @deprecated: not supported in file-only mode
+	FilePath    string `json:"file_path,omitempty"`    // @deprecated: use file:// URI instead
 }
 
 // ExtractionRequest represents a request for extracting a specific section
@@ -287,14 +294,33 @@ func DocumentExtractionWorkflow(ctx workflow.Context, input WorkflowInput) (*Wor
 	}, nil
 }
 
-// Helper function to determine request type
+// getRequestType determines content type from URL scheme or falls back to legacy fields
 func getRequestType(req DocumentRequest) string {
+	// Try modern URL-based approach first
+	if req.ContentURI != "" {
+		if parsedURL, err := url.Parse(req.ContentURI); err == nil && parsedURL.Scheme != "" {
+			switch parsedURL.Scheme {
+			case "file":
+				return "file_path"
+			case "http", "https":
+				return "remote_url"
+			default:
+				// Unknown scheme, try to infer from content
+				return "remote_url"
+			}
+		}
+		// If ContentURI is set but unparseable, treat as text
+		return "text_content"
+	}
+
+	// Fall back to legacy field detection for backward compatibility
 	if req.TextContent != "" {
 		return "text_content"
 	}
 	if req.FilePath != "" {
 		return "file_path"
 	}
+
 	return "unknown"
 }
 
@@ -336,22 +362,62 @@ func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (Extr
 
 	// Create assets based on input type
 	var assets []unstruct.Asset
-	if req.TextContent != "" {
-		// Use text content directly
-		logger.Info("Processing text content",
-			"content_length", len(req.TextContent),
-		)
-		assets = []unstruct.Asset{
-			unstruct.NewTextAsset(req.TextContent),
+
+	if req.ContentURI != "" {
+		// Handle modern URI-based content
+		parsedURL, err := url.Parse(req.ContentURI)
+		if err != nil {
+			logger.Error("Failed to parse content URI", "uri", req.ContentURI, "error", err.Error())
+			return ExtractionTarget{}, fmt.Errorf("invalid content URI: %w", err)
 		}
+
+		switch parsedURL.Scheme {
+		case "file":
+			// Extract file path from file:// URI
+			filePath := parsedURL.Path
+			logger.Info("Processing file URI",
+				"file_path", filePath,
+				"original_uri", req.ContentURI,
+			)
+
+			displayName := req.DisplayName
+			if displayName == "" {
+				displayName = fmt.Sprintf("Temporal Document Processing - %s", filePath)
+			}
+
+			assets = []unstruct.Asset{
+				unstruct.NewFileAsset(
+					client,
+					filePath,
+					unstruct.WithDisplayName(displayName),
+				),
+			}
+
+		case "data":
+			// Handle data: URIs for inline content (not used in this file-only version)
+			logger.Error("Data URIs not supported in file-only mode", "uri", req.ContentURI)
+			return ExtractionTarget{}, fmt.Errorf("data URIs not supported in file-only mode")
+
+		default:
+			logger.Error("Unsupported URI scheme", "scheme", parsedURL.Scheme, "uri", req.ContentURI)
+			return ExtractionTarget{}, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
+		}
+
+	} else if req.TextContent != "" {
+		// Legacy text content support (deprecated in file-only mode)
+		logger.Error("Text content not supported in file-only mode")
+		return ExtractionTarget{}, fmt.Errorf("text content not supported in file-only mode")
+
 	} else if req.FilePath != "" {
-		// Use file asset (will upload to Files API)
+		// Legacy file path support (deprecated, use file:// URI instead)
+		logger.Warn("Using deprecated FilePath field, prefer ContentURI with file:// scheme")
+
 		displayName := req.DisplayName
 		if displayName == "" {
 			displayName = fmt.Sprintf("Temporal Document Processing - %s", req.FilePath)
 		}
 
-		logger.Info("Processing file asset",
+		logger.Info("Processing legacy file path",
 			"file_path", req.FilePath,
 			"display_name", displayName,
 		)
@@ -363,9 +429,10 @@ func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (Extr
 				unstruct.WithDisplayName(displayName),
 			),
 		}
+
 	} else {
-		logger.Error("Invalid request: missing content", "text_content_empty", req.TextContent == "", "file_path_empty", req.FilePath == "")
-		return ExtractionTarget{}, fmt.Errorf("either text_content or file_path must be provided")
+		logger.Error("Invalid request: missing content URI")
+		return ExtractionTarget{}, fmt.Errorf("ContentURI must be provided with file:// scheme")
 	}
 
 	logger.Info("Assets prepared for extraction", "asset_count", len(assets))
@@ -516,22 +583,61 @@ func ExtractSectionActivity(ctx context.Context, req ExtractionRequest) (map[str
 
 	// Create assets based on input type
 	var assets []unstruct.Asset
-	if req.Request.TextContent != "" {
-		logger.Info("Processing text content",
-			"content_length", len(req.Request.TextContent),
-		)
-		assets = []unstruct.Asset{
-			unstruct.NewTextAsset(req.Request.TextContent),
+
+	if req.Request.ContentURI != "" {
+		// Handle modern URI-based content
+		parsedURL, err := url.Parse(req.Request.ContentURI)
+		if err != nil {
+			logger.Error("Failed to parse content URI", "uri", req.Request.ContentURI, "error", err.Error())
+			return nil, fmt.Errorf("invalid content URI: %w", err)
 		}
+
+		switch parsedURL.Scheme {
+		case "file":
+			// Extract file path from file:// URI
+			filePath := parsedURL.Path
+			logger.Info("Processing file URI for section extraction",
+				"file_path", filePath,
+				"original_uri", req.Request.ContentURI,
+				"section", req.Section,
+			)
+
+			displayName := req.Request.DisplayName
+			if displayName == "" {
+				displayName = fmt.Sprintf("Temporal Section Processing - %s - %s", req.Section, filePath)
+			}
+
+			assets = []unstruct.Asset{
+				unstruct.NewFileAsset(
+					client,
+					filePath,
+					unstruct.WithDisplayName(displayName),
+				),
+			}
+
+		default:
+			logger.Error("Unsupported URI scheme for section extraction", "scheme", parsedURL.Scheme, "uri", req.Request.ContentURI)
+			return nil, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
+		}
+
+	} else if req.Request.TextContent != "" {
+		// Legacy text content support (deprecated in file-only mode)
+		logger.Error("Text content not supported in file-only mode")
+		return nil, fmt.Errorf("text content not supported in file-only mode")
+
 	} else if req.Request.FilePath != "" {
+		// Legacy file path support (deprecated, use file:// URI instead)
+		logger.Warn("Using deprecated FilePath field for section extraction, prefer ContentURI with file:// scheme")
+
 		displayName := req.Request.DisplayName
 		if displayName == "" {
 			displayName = fmt.Sprintf("Temporal Section Processing - %s - %s", req.Section, req.Request.FilePath)
 		}
 
-		logger.Info("Processing file asset",
+		logger.Info("Processing legacy file path for section extraction",
 			"file_path", req.Request.FilePath,
 			"display_name", displayName,
+			"section", req.Section,
 		)
 
 		assets = []unstruct.Asset{
@@ -541,9 +647,10 @@ func ExtractSectionActivity(ctx context.Context, req ExtractionRequest) (map[str
 				unstruct.WithDisplayName(displayName),
 			),
 		}
+
 	} else {
-		logger.Error("Invalid request: missing content")
-		return nil, fmt.Errorf("either text_content or file_path must be provided")
+		logger.Error("Invalid request: missing content URI for section extraction")
+		return nil, fmt.Errorf("ContentURI must be provided with file:// scheme")
 	}
 
 	logger.Info("Assets prepared for section extraction", "asset_count", len(assets))
