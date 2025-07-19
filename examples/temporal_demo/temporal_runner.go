@@ -3,24 +3,6 @@
 // The TemporalRunner adapts unstruct's concurrent execution model to work seamlessly
 // within Temporal's deterministic workflow environment, ensuring reliable and
 // fault-tolerant document processing at scale.
-//
-// ⚠️  CRITICAL USAGE REQUIREMENT:
-// When using TemporalRunner.Go(), the provided function MUST NOT make direct
-// external API calls (LLM, HTTP, file I/O). Instead, wrap external calls in
-// Activities to maintain Temporal's determinism contract:
-//
-//	// ❌ WRONG - Direct API call in workflow
-//	runner.Go(func() error {
-//	    return llmClient.Call(prompt) // Breaks determinism!
-//	})
-//
-//	// ✅ CORRECT - External call wrapped in Activity
-//	runner.Go(func() error {
-//	    ao := workflow.ActivityOptions{StartToCloseTimeout: time.Minute}
-//	    ctx := workflow.WithActivityOptions(workflowCtx, ao)
-//	    var result string
-//	    return workflow.ExecuteActivity(ctx, CallLLMActivity, prompt).Get(ctx, &result)
-//	})
 package temporal_demo
 
 import (
