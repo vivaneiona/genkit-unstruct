@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -98,15 +99,19 @@ func main() {
 			slog.String("file_name", fileName),
 		)
 
-		// Create file:// URI
-		fileURI := &url.URL{
-			Scheme: "file",
-			Path:   docsDir + "/" + fileName,
+		// Create file:// URI with absolute path
+		absPath, err := filepath.Abs(filepath.Join(docsDir, fileName))
+		if err != nil {
+			logger.Error("Failed to get absolute path",
+				slog.String("file", fileName),
+				slog.String("error", err.Error()),
+			)
+			continue
 		}
 
 		input := demo.WorkflowInput{
 			Request: demo.DocumentRequest{
-				ContentURI:  fileURI.String(),
+				ContentURI:  fmt.Sprintf("file://%s", absPath),
 				DisplayName: "File URI: " + fileName,
 			},
 		}
@@ -117,7 +122,6 @@ func main() {
 			slog.String("workflow_id", workflowID),
 			slog.String("workflow_type", "DocumentExtractionWorkflow"),
 			slog.String("task_queue", "unstruct-q"),
-			slog.String("content_uri", fileURI.String()),
 			slog.String("file_path", docsDir+"/"+fileName),
 		)
 

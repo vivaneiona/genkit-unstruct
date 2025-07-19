@@ -54,10 +54,11 @@ func main() {
 	)
 
 	// Register activities
+	w.RegisterActivity(demo.ExtractDocumentDataActivity)
 	w.RegisterActivity(demo.ExtractSectionActivity)
 	w.RegisterActivity(demo.DryRunActivity)
 	logger.Info("Registered activities",
-		slog.String("activities", "ExtractSectionActivity, DryRunActivity"),
+		slog.String("activities", "ExtractDocumentDataActivity, ExtractSectionActivity, DryRunActivity"),
 	)
 
 	logger.Info("Worker configuration complete",

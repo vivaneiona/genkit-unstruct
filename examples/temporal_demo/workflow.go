@@ -21,10 +21,6 @@ type DocumentRequest struct {
 	// Note: Only file:// scheme is supported in this file-only version
 	ContentURI  string `json:"content_uri"`
 	DisplayName string `json:"display_name,omitempty"`
-
-	// Legacy fields for backward compatibility (deprecated - use ContentURI instead)
-	TextContent string `json:"text_content,omitempty"` // @deprecated: not supported in file-only mode
-	FilePath    string `json:"file_path,omitempty"`    // @deprecated: use file:// URI instead
 }
 
 // ExtractionRequest represents a request for extracting a specific section
@@ -84,7 +80,7 @@ type WorkflowOutput struct {
 }
 
 // DocumentExtractionWorkflow demonstrates temporal workflow for document processing
-// This implementation uses TemporalRunner for deterministic parallel processing
+// This implementation uses a single activity call for complete document extraction
 func DocumentExtractionWorkflow(ctx workflow.Context, input WorkflowInput) (*WorkflowOutput, error) {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("Starting document extraction workflow",
@@ -113,91 +109,13 @@ func DocumentExtractionWorkflow(ctx workflow.Context, input WorkflowInput) (*Wor
 		"max_attempts", 3,
 	)
 
-	// Create TemporalRunner for deterministic parallel processing within workflow
-	runner := NewTemporalRunner(ctx)
-	logger.Info("Created TemporalRunner for parallel extraction coordination")
+	// Execute single document extraction activity directly (no need for TemporalRunner for single activity)
+	logger.Info("Starting document extraction activity execution")
 
-	// Define result collection struct
-	var results struct {
-		Basic     map[string]interface{}
-		Financial map[string]interface{}
-		Project   map[string]interface{}
-		Contact   map[string]interface{}
-	}
-
-	// Schedule parallel extraction activities using TemporalRunner
-	// Each extraction targets a specific section with appropriate model
-
-	// Basic information extraction (fast model)
-	runner.Go(func() error {
-		var basicResult map[string]interface{}
-		req := ExtractionRequest{
-			Request: input.Request,
-			Section: "basic",
-			Model:   "gemini-1.5-flash",
-		}
-		err := workflow.ExecuteActivity(activityCtx, ExtractSectionActivity, req).Get(activityCtx, &basicResult)
-		if err == nil {
-			results.Basic = basicResult
-			logger.Info("Basic extraction completed", "fields", len(basicResult))
-		}
-		return err
-	})
-
-	// Financial information extraction (precise model)
-	runner.Go(func() error {
-		var financialResult map[string]interface{}
-		req := ExtractionRequest{
-			Request: input.Request,
-			Section: "financial",
-			Model:   "gemini-1.5-pro",
-		}
-		err := workflow.ExecuteActivity(activityCtx, ExtractSectionActivity, req).Get(activityCtx, &financialResult)
-		if err == nil {
-			results.Financial = financialResult
-			logger.Info("Financial extraction completed", "fields", len(financialResult))
-		}
-		return err
-	})
-
-	// Project information extraction (fast model)
-	runner.Go(func() error {
-		var projectResult map[string]interface{}
-		req := ExtractionRequest{
-			Request: input.Request,
-			Section: "project",
-			Model:   "gemini-1.5-flash",
-		}
-		err := workflow.ExecuteActivity(activityCtx, ExtractSectionActivity, req).Get(activityCtx, &projectResult)
-		if err == nil {
-			results.Project = projectResult
-			logger.Info("Project extraction completed", "fields", len(projectResult))
-		}
-		return err
-	})
-
-	// Contact information extraction (precise model, low temperature)
-	runner.Go(func() error {
-		var contactResult map[string]interface{}
-		req := ExtractionRequest{
-			Request: input.Request,
-			Section: "contact",
-			Model:   "gemini-1.5-pro",
-			Options: map[string]interface{}{"temperature": 0.2},
-		}
-		err := workflow.ExecuteActivity(activityCtx, ExtractSectionActivity, req).Get(activityCtx, &contactResult)
-		if err == nil {
-			results.Contact = contactResult
-			logger.Info("Contact extraction completed", "fields", len(contactResult))
-		}
-		return err
-	})
-
-	// Wait for all parallel extractions to complete
-	logger.Info("Waiting for parallel extractions to complete")
-	err := runner.Wait()
+	var finalResult ExtractionTarget
+	err := workflow.ExecuteActivity(activityCtx, ExtractDocumentDataActivity, input.Request).Get(activityCtx, &finalResult)
 	if err != nil {
-		logger.Error("Parallel extraction failed",
+		logger.Error("Document extraction failed",
 			"error", err.Error(),
 			"workflow_id", workflow.GetInfo(ctx).WorkflowExecution.ID,
 		)
@@ -207,71 +125,18 @@ func DocumentExtractionWorkflow(ctx workflow.Context, input WorkflowInput) (*Wor
 		}, fmt.Errorf("extraction failed: %w", err)
 	}
 
-	// Combine results into final structure
-	var finalResult ExtractionTarget
-
-	// Map basic fields
-	if results.Basic != nil {
-		if title, ok := results.Basic["title"].(string); ok {
-			finalResult.Basic.Title = title
-		}
-		if author, ok := results.Basic["author"].(string); ok {
-			finalResult.Basic.Author = author
-		}
-		if docType, ok := results.Basic["doc_type"].(string); ok {
-			finalResult.Basic.DocType = docType
-		}
-		if date, ok := results.Basic["date"].(string); ok {
-			finalResult.Basic.Date = date
-		}
-	}
-
-	// Map financial fields
-	if results.Financial != nil {
-		if budget, ok := results.Financial["budget"].(float64); ok {
-			finalResult.Financial.Budget = budget
-		}
-		if currency, ok := results.Financial["currency"].(string); ok {
-			finalResult.Financial.Currency = currency
-		}
-	}
-
-	// Map project fields
-	if results.Project != nil {
-		if code, ok := results.Project["code"].(string); ok {
-			finalResult.Project.Code = code
-		}
-		if status, ok := results.Project["status"].(string); ok {
-			finalResult.Project.Status = status
-		}
-		if teamSize, ok := results.Project["team_size"].(int); ok {
-			finalResult.Project.TeamSize = teamSize
-		}
-		if startDate, ok := results.Project["start_date"].(string); ok {
-			finalResult.Project.StartDate = startDate
-		}
-		if endDate, ok := results.Project["end_date"].(string); ok {
-			finalResult.Project.EndDate = endDate
-		}
-	}
-
-	// Map contact fields
-	if results.Contact != nil {
-		if name, ok := results.Contact["name"].(string); ok {
-			finalResult.Contact.Name = name
-		}
-		if email, ok := results.Contact["email"].(string); ok {
-			finalResult.Contact.Email = email
-		}
-		if phone, ok := results.Contact["phone"].(string); ok {
-			finalResult.Contact.Phone = phone
-		}
-	}
+	logger.Info("Document extraction completed successfully",
+		"title", finalResult.Basic.Title,
+		"author", finalResult.Basic.Author,
+		"project_code", finalResult.Project.Code,
+		"budget", finalResult.Financial.Budget,
+		"contact_name", finalResult.Contact.Name,
+	)
 
 	processingTime := workflow.Now(ctx).Sub(startTime)
-	logger.Info("Document extraction completed successfully",
+	logger.Info("Document extraction workflow completed successfully",
 		"processing_time", processingTime,
-		"model_calls", 4,
+		"model_calls", 1,
 		"workflow_id", workflow.GetInfo(ctx).WorkflowExecution.ID,
 		"basic_title", finalResult.Basic.Title,
 		"project_code", finalResult.Project.Code,
@@ -288,7 +153,7 @@ func DocumentExtractionWorkflow(ctx workflow.Context, input WorkflowInput) (*Wor
 			TokensUsed     int           `json:"tokens_used"`
 		}{
 			ProcessingTime: processingTime,
-			ModelCalls:     4, // basic, financial, project, contact
+			ModelCalls:     1, // Single extraction activity call
 			TokensUsed:     0, // Would be populated in real implementation
 		},
 	}, nil
@@ -313,14 +178,6 @@ func getRequestType(req DocumentRequest) string {
 		return "text_content"
 	}
 
-	// Fall back to legacy field detection for backward compatibility
-	if req.TextContent != "" {
-		return "text_content"
-	}
-	if req.FilePath != "" {
-		return "file_path"
-	}
-
 	return "unknown"
 }
 
@@ -337,6 +194,7 @@ func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (Extr
 		"workflow_id", info.WorkflowExecution.ID,
 		"request_type", getRequestType(req),
 		"display_name", req.DisplayName,
+		"content_uri", req.ContentURI,
 	)
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -375,9 +233,15 @@ func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (Extr
 		case "file":
 			// Extract file path from file:// URI
 			filePath := parsedURL.Path
+			// Remove leading slash for relative paths
+			if len(filePath) > 0 && filePath[0] == '/' {
+				filePath = filePath[1:]
+			}
+
 			logger.Info("Processing file URI",
 				"file_path", filePath,
 				"original_uri", req.ContentURI,
+				"parsed_path", parsedURL.Path,
 			)
 
 			displayName := req.DisplayName
@@ -401,33 +265,6 @@ func ExtractDocumentDataActivity(ctx context.Context, req DocumentRequest) (Extr
 		default:
 			logger.Error("Unsupported URI scheme", "scheme", parsedURL.Scheme, "uri", req.ContentURI)
 			return ExtractionTarget{}, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
-		}
-
-	} else if req.TextContent != "" {
-		// Legacy text content support (deprecated in file-only mode)
-		logger.Error("Text content not supported in file-only mode")
-		return ExtractionTarget{}, fmt.Errorf("text content not supported in file-only mode")
-
-	} else if req.FilePath != "" {
-		// Legacy file path support (deprecated, use file:// URI instead)
-		logger.Warn("Using deprecated FilePath field, prefer ContentURI with file:// scheme")
-
-		displayName := req.DisplayName
-		if displayName == "" {
-			displayName = fmt.Sprintf("Temporal Document Processing - %s", req.FilePath)
-		}
-
-		logger.Info("Processing legacy file path",
-			"file_path", req.FilePath,
-			"display_name", displayName,
-		)
-
-		assets = []unstruct.Asset{
-			unstruct.NewFileAsset(
-				client,
-				req.FilePath,
-				unstruct.WithDisplayName(displayName),
-			),
 		}
 
 	} else {
@@ -502,16 +339,45 @@ func DryRunActivity(ctx context.Context, req DocumentRequest) (map[string]interf
 
 	// Create extractor
 	extractor := unstruct.New[ExtractionTarget](client, Prompts)
+	// Create assets based on input type
+	assets := []unstruct.Asset{}
+	// Handle modern URI-based content
+	parsedURL, err := url.Parse(req.ContentURI)
+	if err != nil {
+		logger.Error("Failed to parse content URI for dry run", "uri", req.ContentURI, "error", err.Error())
+		return nil, fmt.Errorf("invalid content URI: %w", err)
+	}
 
-	// Create assets
-	var assets []unstruct.Asset
-	if req.TextContent != "" {
-		logger.Info("Using provided text content for dry run", "content_length", len(req.TextContent))
-		assets = []unstruct.Asset{unstruct.NewTextAsset(req.TextContent)}
-	} else {
-		// For dry run, we can use a placeholder if no text is provided
-		logger.Info("Using placeholder text for dry run")
-		assets = []unstruct.Asset{unstruct.NewTextAsset("Sample document for cost estimation")}
+	switch parsedURL.Scheme {
+	case "file":
+		// Extract file path from file:// URI
+		filePath := parsedURL.Path
+		// Remove leading slash for relative paths
+		if len(filePath) > 0 && filePath[0] == '/' {
+			filePath = filePath[1:]
+		}
+
+		logger.Info("Processing file URI for dry run",
+			"file_path", filePath,
+			"original_uri", req.ContentURI,
+		)
+
+		displayName := req.DisplayName
+		if displayName == "" {
+			displayName = fmt.Sprintf("Dry Run - %s", filePath)
+		}
+
+		assets = append(assets,
+			unstruct.NewFileAsset(
+				client,
+				filePath,
+				unstruct.WithDisplayName(displayName),
+			),
+		)
+
+	default:
+		logger.Error("Unsupported URI scheme for dry run", "scheme", parsedURL.Scheme, "uri", req.ContentURI)
+		return nil, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
 	}
 
 	// Perform dry run
@@ -620,34 +486,6 @@ func ExtractSectionActivity(ctx context.Context, req ExtractionRequest) (map[str
 			return nil, fmt.Errorf("unsupported URI scheme: %s", parsedURL.Scheme)
 		}
 
-	} else if req.Request.TextContent != "" {
-		// Legacy text content support (deprecated in file-only mode)
-		logger.Error("Text content not supported in file-only mode")
-		return nil, fmt.Errorf("text content not supported in file-only mode")
-
-	} else if req.Request.FilePath != "" {
-		// Legacy file path support (deprecated, use file:// URI instead)
-		logger.Warn("Using deprecated FilePath field for section extraction, prefer ContentURI with file:// scheme")
-
-		displayName := req.Request.DisplayName
-		if displayName == "" {
-			displayName = fmt.Sprintf("Temporal Section Processing - %s - %s", req.Section, req.Request.FilePath)
-		}
-
-		logger.Info("Processing legacy file path for section extraction",
-			"file_path", req.Request.FilePath,
-			"display_name", displayName,
-			"section", req.Section,
-		)
-
-		assets = []unstruct.Asset{
-			unstruct.NewFileAsset(
-				client,
-				req.Request.FilePath,
-				unstruct.WithDisplayName(displayName),
-			),
-		}
-
 	} else {
 		logger.Error("Invalid request: missing content URI for section extraction")
 		return nil, fmt.Errorf("ContentURI must be provided with file:// scheme")
@@ -655,7 +493,7 @@ func ExtractSectionActivity(ctx context.Context, req ExtractionRequest) (map[str
 
 	logger.Info("Assets prepared for section extraction", "asset_count", len(assets))
 
-	// Create a simple extraction for the specific section
+	// Create targeted extractor for section-specific extraction
 	logger.Info("Starting section extraction",
 		"section", req.Section,
 		"model", req.Model,
@@ -663,37 +501,127 @@ func ExtractSectionActivity(ctx context.Context, req ExtractionRequest) (map[str
 
 	extractionStart := time.Now()
 
-	// Mock extraction result based on section
+	// Define section-specific extraction types
+	model := req.Model
+	if model == "" {
+		model = "gemini-1.5-flash" // Default model
+	}
+
+	// Create a typed result map for the specific section
 	var result map[string]interface{}
+
 	switch req.Section {
 	case "basic":
-		result = map[string]interface{}{
-			"title":    "Sample Document Title",
-			"author":   "Sample Author",
-			"doc_type": "Sample Type",
-			"date":     "2024-01-01",
+		// Create a basic info extractor
+		type BasicInfo struct {
+			Title   string `json:"title"`
+			Author  string `json:"author"`
+			DocType string `json:"doc_type"`
+			Date    string `json:"date"`
 		}
+
+		basicExtractor := unstruct.New[BasicInfo](client, Prompts)
+		basicResult, err := basicExtractor.Unstruct(
+			ctx,
+			assets,
+			unstruct.WithModel(model),
+			unstruct.WithTimeout(2*time.Minute),
+		)
+		if err != nil {
+			logger.Error("Basic section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("basic section extraction failed: %w", err)
+		}
+
+		result = map[string]interface{}{
+			"title":    basicResult.Title,
+			"author":   basicResult.Author,
+			"doc_type": basicResult.DocType,
+			"date":     basicResult.Date,
+		}
+
 	case "financial":
-		result = map[string]interface{}{
-			"budget":   50000.0,
-			"currency": "USD",
+		// Create a financial info extractor
+		type FinancialInfo struct {
+			Budget   float64 `json:"budget"`
+			Currency string  `json:"currency"`
 		}
+
+		financialExtractor := unstruct.New[FinancialInfo](client, Prompts)
+		financialResult, err := financialExtractor.Unstruct(
+			ctx,
+			assets,
+			unstruct.WithModel(model),
+			unstruct.WithTimeout(2*time.Minute),
+		)
+		if err != nil {
+			logger.Error("Financial section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("financial section extraction failed: %w", err)
+		}
+
+		result = map[string]interface{}{
+			"budget":   financialResult.Budget,
+			"currency": financialResult.Currency,
+		}
+
 	case "project":
-		result = map[string]interface{}{
-			"code":       "PROJ-001",
-			"status":     "Active",
-			"team_size":  5,
-			"start_date": "2024-01-01",
-			"end_date":   "2024-12-31",
+		// Create a project info extractor
+		type ProjectInfo struct {
+			Code      string `json:"code"`
+			Status    string `json:"status"`
+			TeamSize  int    `json:"team_size"`
+			StartDate string `json:"start_date"`
+			EndDate   string `json:"end_date"`
 		}
+
+		projectExtractor := unstruct.New[ProjectInfo](client, Prompts)
+		projectResult, err := projectExtractor.Unstruct(
+			ctx,
+			assets,
+			unstruct.WithModel(model),
+			unstruct.WithTimeout(2*time.Minute),
+		)
+		if err != nil {
+			logger.Error("Project section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("project section extraction failed: %w", err)
+		}
+
+		result = map[string]interface{}{
+			"code":       projectResult.Code,
+			"status":     projectResult.Status,
+			"team_size":  projectResult.TeamSize,
+			"start_date": projectResult.StartDate,
+			"end_date":   projectResult.EndDate,
+		}
+
 	case "contact":
-		result = map[string]interface{}{
-			"name":  "John Doe",
-			"email": "john.doe@example.com",
-			"phone": "+1-555-0123",
+		// Create a contact info extractor
+		type ContactInfo struct {
+			Name  string `json:"name"`
+			Email string `json:"email"`
+			Phone string `json:"phone"`
 		}
+
+		contactExtractor := unstruct.New[ContactInfo](client, Prompts)
+		contactResult, err := contactExtractor.Unstruct(
+			ctx,
+			assets,
+			unstruct.WithModel(model),
+			unstruct.WithTimeout(2*time.Minute),
+		)
+		if err != nil {
+			logger.Error("Contact section extraction failed", "error", err.Error())
+			return nil, fmt.Errorf("contact section extraction failed: %w", err)
+		}
+
+		result = map[string]interface{}{
+			"name":  contactResult.Name,
+			"email": contactResult.Email,
+			"phone": contactResult.Phone,
+		}
+
 	default:
-		result = map[string]interface{}{}
+		logger.Error("Unsupported section for extraction", "section", req.Section)
+		return nil, fmt.Errorf("unsupported section: %s", req.Section)
 	}
 
 	extractionDuration := time.Since(extractionStart)
