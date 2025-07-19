@@ -1,0 +1,27 @@
+Extract timeline and date information from this document.
+
+Look for:
+- Start dates and end dates
+- Project milestones and deadlines
+- Timeline information and schedules
+- Duration and time periods
+
+Extract the following fields: {% for key in keys %}{% if not loop.first %}, {% endif %}{{ key }}{% endfor %}
+
+IMPORTANT: Extract dates as they appear in the document.
+
+Focus on:
+- Project start dates
+- Project end dates or completion dates
+- Key milestones and deadlines
+- Timeline phases and schedules
+
+IMPORTANT FOR DATES:
+- Extract dates exactly as they appear in the document
+- For example: "January 1, 2024" should be extracted as "January 1, 2024"
+- For example: "2024-01-01" should be extracted as "2024-01-01"
+- For example: "Q1 2024" should be extracted as "Q1 2024"
+
+Return dates in their original format from the document.
+
+Return as a JSON object with the exact field names from the Keys list.

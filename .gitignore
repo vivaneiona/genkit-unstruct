@@ -50,6 +50,8 @@ Thumbs.db
 
 .env
 
+.tmp.pid
+
 vendor/
 
 _docs/

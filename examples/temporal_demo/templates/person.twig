@@ -1,0 +1,29 @@
+Extract person/contact information from this document.
+
+Look for:
+- Names of people (authors, managers, team members, etc.)
+- Contact information (email addresses, phone numbers)
+- Job titles and roles
+- Organizational relationships
+
+Extract the following fields: {% for key in keys %}{% if not loop.first %}, {% endif %}{{ key }}{% endfor %}
+
+IMPORTANT: If multiple people are found, return information for the PRIMARY project lead only.
+
+Focus on:
+- Full names of individuals
+- Professional email addresses
+- Phone numbers with country codes
+- Job titles and departments
+- Team or organizational structure
+
+IMPORTANT FOR PROJECT LEAD:
+- Look for terms like "Project Lead:", "Team Lead:", "Manager:", "Lead:", etc.
+- Extract the full name that appears after these terms
+- Return a single name string, not an array
+
+Return a single string value for the project lead, not an array of names.
+- For example: "Project Lead: Jane Doe" should extract "Jane Doe"
+- For example: "Team Lead: Michael Chen" should extract "Michael Chen"
+
+Return as a JSON object with the exact field names from the Keys list.

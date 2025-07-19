@@ -1,0 +1,28 @@
+Extract project-related information from this document.
+
+Look for:
+- Project names, codes, or identifiers
+- Project status, timeline, and phases
+- Budget and resource information (extract ONLY the numeric value without commas or currency symbols)
+- Project goals and objectives
+
+Extract the following fields: {% for key in keys %}{% if not loop.first %}, {% endif %}{{ key }}{% endfor %}
+
+IMPORTANT: If multiple projects are found, return information for the FIRST or PRIMARY project only.
+
+Pay attention to:
+- Specific project identifiers or codes
+- Timeline information (start dates, end dates, milestones)
+- Budget amounts: Extract only the numeric value (e.g., if you see "$150,000.00" extract 150000)
+- Currency: Extract the currency symbol or code (USD, EUR, etc.)
+- Project phases or stages
+- Team size: Extract only the numeric value
+
+IMPORTANT FOR BUDGET: 
+- If you see "$150,000.00 USD", extract budget as 150000 and currency as "USD"
+
+Return a single project object, not an array. Use the exact field names requested.
+- If you see "$220,000.00 USD", extract budget as 220000 and currency as "USD"
+- Remove all commas, dollar signs, and decimal points from budget numbers
+
+Return as a JSON object with the exact field names from the Keys list.

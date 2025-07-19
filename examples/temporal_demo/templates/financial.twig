@@ -1,0 +1,29 @@
+Extract financial information from this document.
+
+Look for:
+- Budget amounts, costs, and financial figures
+- Currency symbols and codes (USD, EUR, etc.)
+- Financial constraints and allocations
+- Cost breakdowns and estimates
+
+Extract the following fields: {% for key in keys %}{% if not loop.first %}, {% endif %}{{ key }}{% endfor %}
+
+IMPORTANT: Extract budget as numeric value only (no symbols, commas, or currency).
+
+Focus on:
+- Total project budget or cost
+- Currency type (USD, EUR, GBP, etc.)
+- Financial constraints or limits
+- Cost estimates and allocations
+
+IMPORTANT FOR BUDGET:
+- Extract only the numeric value without commas, dollar signs, or decimal points
+- For example: "$150,000.00" should extract as "150000"
+- For example: "€75,500" should extract as "75500"
+
+IMPORTANT FOR CURRENCY:
+- Extract the currency symbol or code
+- For example: "$150,000.00 USD" should extract currency as "USD"
+- For example: "€75,500" should extract currency as "EUR"
+
+Return as a JSON object with the exact field names from the Keys list.
