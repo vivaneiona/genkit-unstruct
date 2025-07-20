@@ -70,6 +70,17 @@ func WithRunner(r Runner) func(*Options) {
 	return func(o *Options) { o.Runner = r }
 }
 
+// WithConcurrency sets maximum concurrent LLM calls to prevent resource exhaustion.
+// Default is runtime.NumCPU(). Set to 1 for sequential processing.
+func WithConcurrency(maxConcurrency int) func(*Options) {
+	return func(o *Options) {
+		if o.Runner == nil {
+			// Create a limited runner with the specified concurrency
+			o.Runner = NewLimitedRunner(context.Background(), maxConcurrency)
+		}
+	}
+}
+
 func WithOutputSchema(schema string) func(*Options) {
 	return func(o *Options) { o.OutputSchemaJSON = schema }
 }

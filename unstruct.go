@@ -689,11 +689,12 @@ func statsToPlan(stats *ExecutionStats) *PlanNode {
 	// Remove duplicates
 	uniqueFields := extractUniqueStrings(fields)
 
+	costConfig := DefaultCostCalculationConfig()
 	rootNode := &PlanNode{
 		Type:               SchemaAnalysisType,
 		Fields:             uniqueFields,
 		InputTokens:        10, // Schema analysis overhead
-		EstCost:            float64(stats.PromptGroups) * SchemaAnalysisBaseCost,
+		EstCost:            float64(stats.PromptGroups) * costConfig.SchemaAnalysisBaseCost,
 		Children:           make([]*PlanNode, 0),
 		ExpectedModels:     make([]string, 0, len(stats.ModelCalls)),
 		ExpectedCallCounts: stats.ModelCalls,
@@ -713,7 +714,7 @@ func statsToPlan(stats *ExecutionStats) *PlanNode {
 			Fields:       groupExec.Fields,
 			InputTokens:  groupExec.InputTokens,
 			OutputTokens: groupExec.OutputTokens,
-			EstCost:      PromptCallBaseCost + float64(groupExec.InputTokens)*PromptCallTokenFactor,
+			EstCost:      costConfig.PromptCallBaseCost + float64(groupExec.InputTokens)*costConfig.PromptCallTokenFactor,
 			Children:     make([]*PlanNode, 0),
 		}
 
@@ -724,7 +725,7 @@ func statsToPlan(stats *ExecutionStats) *PlanNode {
 	mergeNode := &PlanNode{
 		Type:     MergeFragmentsType,
 		Fields:   uniqueFields,
-		EstCost:  MergeFragmentsBaseCost + float64(len(uniqueFields))*MergeFragmentsPerField,
+		EstCost:  costConfig.MergeFragmentsBaseCost + float64(len(uniqueFields))*costConfig.MergeFragmentsPerField,
 		Children: make([]*PlanNode, 0),
 	}
 	rootNode.Children = append(rootNode.Children, mergeNode)

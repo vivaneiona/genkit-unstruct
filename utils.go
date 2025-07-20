@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+// min returns the smaller of two integers (for Go versions < 1.21 compatibility).
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // buildPrompt constructs the final prompt from template, keys, and document
 func buildPrompt(tpl string, keys []string, doc string) string {
 	slog.Debug("starting prompt construction", "template_length", len(tpl), "keys_count", len(keys), "document_length", len(doc))

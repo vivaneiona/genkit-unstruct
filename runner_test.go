@@ -174,11 +174,15 @@ func TestErrGroupRunner_ConcurrentAccess(t *testing.T) {
 
 func TestNewErrGroupRunner(t *testing.T) {
 	ctx := context.Background()
-	runner := newErrGroupRunner(ctx)
+	runner := newErrGroupRunner(ctx, 5) // Add concurrency limit
 
 	require.NotNil(t, runner, "newErrGroupRunner returned nil")
 	require.NotNil(t, runner.ctx, "runner.ctx should not be nil")
 	require.NotNil(t, runner.eg, "runner.eg should not be nil")
+	require.NotNil(t, runner.sem, "runner.sem should not be nil")
+
+	// Check that semaphore has correct capacity
+	assert.Equal(t, 5, cap(runner.sem), "semaphore should have capacity of 5")
 
 	// The context should be derived from the parent
 	assert.NotEqual(t, ctx, runner.ctx, "runner.ctx should be a derived context, not the same as parent")

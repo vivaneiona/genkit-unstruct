@@ -211,6 +211,16 @@ fmt.Println(plan)
 // Total: 2 API calls, ~320 tokens
 ```
 
+**Key features:**
+
+* **Automatic batching:** Fields with the same tag are extracted together in one LLM request. This reduces the number of API calls (saves time and cost). No need to manually orchestrate which fields go in which prompt – the tags handle that.
+* **Parallel execution:** It runs all the needed LLM calls concurrently under the hood (uses Go routines and an `errgroup` by default), so overall extraction is as fast as possible given your model choices.
+* **Multi-model support:** You can assign different models to different field groups. For example, use a quick model for simple text and a more advanced model for numbers or summaries. The library will route each group to the right model automatically.
+* **Multi-modal inputs:** Supports extracting from plain text, images, and PDFs in one shot. You just provide an array of `unstruct.Asset` (there are helpers like `NewTextAsset`, `NewFileAsset`, `NewImageAsset` etc.), and it handles packaging that content for the model (e.g. uploading files, embedding images).
+* **Structured output:** You get a typed Go struct out of the process. genkit-unstruct takes care of parsing the model’s JSON output and merging multiple responses. Nested structs and slices are supported (nested fields can inherit their parent’s prompt tag by default), so you can model complex data hierarchies.
+* **Extras for optimization:** There’s a `DryRun()` mode that simulates the extraction to estimate how many tokens *would* be used and how many calls *would* be made – useful for cost planning. You can also `Explain()` an extraction which prints an execution plan (which prompt groups will run, with what model, etc.). These features helped us sanity-check prompts and budget before running big jobs.
+* **Extensible design:** The concurrency is abstracted via a small `Runner` interface. By default it just uses a background errgroup, but you can swap in a custom runner – in our case we built a Temporal-compatible runner so we could run the extraction inside a Temporal workflow (to get durable, replayable execution). The prompt system is also pluggable: you can supply prompt templates via a simple map (as shown) or use the provided Twig template integration for more complex prompt generation. The idea is to integrate into real production workflows, not be a toy.
+
 ## Advanced features
 
 ### Prompt templates

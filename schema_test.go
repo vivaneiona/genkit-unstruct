@@ -56,7 +56,7 @@ type EdgeCaseStruct struct {
 	NoTag      string                 `json:"no_tag"`
 	EmptyTag   string                 `json:"empty_tag" unstruct:""`
 	TimeField  time.Time              `json:"time_field" unstruct:"temporal"`
-	unexported string                 `json:"unexported" unstruct:"basic"`
+	unexported string                 `unstruct:"basic"`
 	Anonymous  struct{ Field string } // Anonymous struct
 }
 

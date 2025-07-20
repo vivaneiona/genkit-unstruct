@@ -154,27 +154,19 @@ func DefaultCostCalculationConfig() CostCalculationConfig {
 	}
 }
 
-// Token estimation constants (kept for backward compatibility)
-const (
-	CharsPerToken      = 4   // Average characters per token for English text
-	TokensPerWordRatio = 1.3 // Average tokens per word
-	BasePromptTokens   = 50  // Base tokens for prompt template
-	DocumentTokens     = 200 // Tokens for document context
-	SchemaBaseTokens   = 20  // Base overhead for schema analysis
-	TokensPerField     = 5   // Additional tokens per field in schema
-)
+// EstimateTokensFromText provides a rough token estimate from text length using default configuration.
+// For custom configuration, use PlanBuilder.EstimateTokensFromTextCustom.
+func EstimateTokensFromText(text string) int {
+	config := DefaultTokenEstimationConfig()
+	return (len(text) + config.CharsPerToken - 1) / config.CharsPerToken
+}
 
-// Cost calculation constants (kept for backward compatibility)
-const (
-	SchemaAnalysisBaseCost = 1.0  // Base cost for schema analysis
-	SchemaAnalysisPerField = 0.5  // Additional cost per field
-	PromptCallBaseCost     = 3.0  // Base cost for prompt calls
-	PromptCallTokenFactor  = 0.01 // Cost factor per input token
-	MergeFragmentsBaseCost = 0.5  // Base cost for merging
-	MergeFragmentsPerField = 0.1  // Additional cost per field
-	TransformCost          = 1.5  // Cost for transformations
-	DefaultNodeCost        = 1.0  // Default cost for unknown types
-)
+// EstimateTokensFromWords provides a rough token estimate from word count using default configuration.
+// For custom configuration, use PlanBuilder.EstimateTokensFromWordsCustom.
+func EstimateTokensFromWords(wordCount int) int {
+	config := DefaultTokenEstimationConfig()
+	return int(math.Ceil(float64(wordCount) * config.TokensPerWordRatio))
+}
 
 // DefaultModelPricing returns current input/output token costs (USD per 1 000 tokens).
 func DefaultModelPricing() map[string]ModelPrice {
@@ -874,16 +866,6 @@ func (pb *PlanBuilder) FormatPlan(plan *PlanNode, format FormatType) (string, er
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
-}
-
-// EstimateTokensFromText provides a rough token estimate from text length using constants.
-func EstimateTokensFromText(text string) int {
-	return (len(text) + CharsPerToken - 1) / CharsPerToken
-}
-
-// EstimateTokensFromWords provides a rough token estimate from word count using constants.
-func EstimateTokensFromWords(wordCount int) int {
-	return int(math.Ceil(float64(wordCount) * TokensPerWordRatio))
 }
 
 // WithTokenConfig sets custom token estimation configuration.

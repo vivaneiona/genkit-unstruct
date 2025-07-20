@@ -2,8 +2,11 @@ package unstruct
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 )
+
+var modelNameRegex = regexp.MustCompile(`(?i)^(gemini|gpt|claude)[\-\d\.]|^(vertex|googleai|openai)/|^(googleai|vertex)[\-\d\.]`)
 
 type tagParts struct {
 	prompt     string            // empty ⇒ inherit
@@ -20,16 +23,15 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 		return
 	}
 
-	// Check for legacy comma format first (no URL parsing needed)
+	// Fast path: no "/" and no "?" means simple tag
 	if !strings.Contains(tag, "/") && !strings.Contains(tag, "?") {
 		if strings.Contains(tag, ",") {
 			if parts := strings.Split(tag, ","); len(parts) == 2 {
 				tp.prompt, tp.model = parts[0], parts[1]
 				return
-			} else if len(parts) > 2 {
-				// malformed comma format, fallback to inherited prompt
-				return
 			}
+			// malformed comma format, fallback to inherited prompt
+			return
 		}
 		// Single token - check if it looks like a model
 		if looksLikeModel(tag) {
@@ -62,59 +64,27 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 		if parts := strings.Split(pathPart, ","); len(parts) == 2 {
 			tp.prompt, tp.model = parts[0], parts[1]
 			return
-		} else if len(parts) > 2 {
-			// malformed comma format, fallback to inherited prompt
-			return
 		}
+		// malformed comma format, fallback to inherited prompt
+		return
 	}
 
-	// path-style (slash-separated) or single token
 	segs := strings.Split(pathPart, "/")
 
-	// Special handling for simple prefix cases (backward compatibility)
-	if len(segs) >= 2 {
-		firstSeg := segs[0]
-		if firstSeg == "model" || firstSeg == "prompt" || firstSeg == "group" {
-			// Check if this looks like a simple prefix case (not URL-style)
-			// URL-style should have multiple different keys
-			hasMultipleKeys := false
-			seenKeys := make(map[string]bool)
-
-			for i := 0; i < len(segs); i += 2 {
-				if i < len(segs) && (segs[i] == "prompt" || segs[i] == "model" || segs[i] == "group") {
-					seenKeys[segs[i]] = true
-				}
-			}
-
-			// Only treat as URL-style if we have multiple different key types
-			if len(seenKeys) > 1 {
-				hasMultipleKeys = true
-			}
-
-			if !hasMultipleKeys {
-				// Simple prefix case - everything after first segment is the value
-				value := strings.Join(segs[1:], "/")
-				switch firstSeg {
-				case "model":
-					tp.model = value
-				case "prompt":
-					tp.prompt = value
-				case "group":
-					tp.prompt = "group:" + value
-				}
-				return
-			}
-		}
-	}
-
-	// iterate through slash segments looking for keys (URL-style format)
+	// Process URL-style segments (prompt/name/model/name/etc)
+	// Keys can only appear at the start or after another key/value pair
 	for i := 0; i < len(segs); i++ {
 		switch segs[i] {
 		case "prompt":
 			if i+1 < len(segs) {
-				// Find the next key or end of segments
+				// Find the next key starting from appropriate position
 				nextKeyIndex := len(segs)
-				for j := i + 2; j < len(segs); j++ {
+				// Look for next key starting at the next even position after value
+				startSearch := i + 2
+				if startSearch%2 == 1 {
+					startSearch++ // Ensure we start at even position
+				}
+				for j := startSearch; j < len(segs); j += 2 {
 					if segs[j] == "prompt" || segs[j] == "model" || segs[j] == "group" {
 						nextKeyIndex = j
 						break
@@ -122,27 +92,40 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 				}
 				// Join all segments between this key and the next key
 				tp.prompt = strings.Join(segs[i+1:nextKeyIndex], "/")
-				i = nextKeyIndex - 1 // -1 because loop will increment
 			}
 		case "model":
 			if i+1 < len(segs) {
-				// Find the next key or end of segments
-				nextKeyIndex := len(segs)
-				for j := i + 2; j < len(segs); j++ {
-					if segs[j] == "prompt" || segs[j] == "model" || segs[j] == "group" {
-						nextKeyIndex = j
-						break
+				// For simple case like model/value, take everything remaining
+				if i == 0 {
+					tp.model = strings.Join(segs[i+1:], "/")
+				} else {
+					// Find the next key starting from appropriate position
+					nextKeyIndex := len(segs)
+					// Look for next key starting at the next even position after value
+					startSearch := i + 2
+					if startSearch%2 == 1 {
+						startSearch++ // Ensure we start at even position
 					}
+					for j := startSearch; j < len(segs); j += 2 {
+						if segs[j] == "prompt" || segs[j] == "model" || segs[j] == "group" {
+							nextKeyIndex = j
+							break
+						}
+					}
+					// Join all segments between this key and the next key
+					tp.model = strings.Join(segs[i+1:nextKeyIndex], "/")
 				}
-				// Join all segments between this key and the next key
-				tp.model = strings.Join(segs[i+1:nextKeyIndex], "/")
-				i = nextKeyIndex - 1 // -1 because loop will increment
 			}
 		case "group":
 			if i+1 < len(segs) {
-				// Find the next key or end of segments
+				// Find the next key starting from appropriate position
 				nextKeyIndex := len(segs)
-				for j := i + 2; j < len(segs); j++ {
+				// Look for next key starting at the next even position after value
+				startSearch := i + 2
+				if startSearch%2 == 1 {
+					startSearch++ // Ensure we start at even position
+				}
+				for j := startSearch; j < len(segs); j += 2 {
 					if segs[j] == "prompt" || segs[j] == "model" || segs[j] == "group" {
 						nextKeyIndex = j
 						break
@@ -150,7 +133,6 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 				}
 				// Join all segments between this key and the next key
 				tp.prompt = "group:" + strings.Join(segs[i+1:nextKeyIndex], "/")
-				i = nextKeyIndex - 1 // -1 because loop will increment
 			}
 		default:
 			// first segment without a recognised key →
@@ -168,14 +150,7 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 	return
 }
 
-// simple heuristic for model strings
+// looksLikeModel uses a regex to identify model strings more accurately.
 func looksLikeModel(s string) bool {
-	if strings.Contains(s, "gemini") ||
-		strings.HasPrefix(s, "vertex:") ||
-		strings.HasPrefix(s, "googleai/") ||
-		strings.HasPrefix(s, "vertex/") ||
-		strings.Contains(s, ":gemini") {
-		return true
-	}
-	return false
+	return modelNameRegex.MatchString(s)
 }
