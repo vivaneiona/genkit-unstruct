@@ -2,6 +2,8 @@
 
 Concurrent data extraction from unstructured text and images using AI models.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/vivaneiona/genkit-unstruct.svg)](https://pkg.go.dev/github.com/vivaneiona/genkit-unstruct)
+
 [![Go Report Card](https://goreportcard.com/badge/github.com/vivaneiona/genkit-unstruct)](https://goreportcard.com/report/github.com/vivaneiona/genkit-unstruct)
 
 A Go library for extracting structured data from unstructured sources using AI models. Built on Google Genkit, it automatically batches fields by prompt, executes extractions concurrently, and merges results into typed structs.
