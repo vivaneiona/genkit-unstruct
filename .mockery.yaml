@@ -1,0 +1,14 @@
+all: true
+force-file-write: true
+formatter: goimports
+log-level: info
+filename: mocks.go
+recursive: true
+template: testify
+packages:
+  github.com/vivaneiona/genkit-unstruct:
+    config:
+      all: true
+      dir: mocks
+      pkgname: "mocks" 
+      filename: mocks.go
