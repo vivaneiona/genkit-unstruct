@@ -73,9 +73,10 @@ func TestGroupIntegration(t *testing.T) {
 		// Find the groups
 		var inheritedGroup, parentGroup promptKey
 		for pk := range schema.group2keys {
-			if pk.prompt == "inherited-prompt" {
+			switch pk.prompt {
+			case "inherited-prompt":
 				inheritedGroup = pk
-			} else if pk.prompt == "parent-prompt" {
+			case "parent-prompt":
 				parentGroup = pk
 			}
 		}

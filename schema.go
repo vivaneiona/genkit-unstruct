@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-const unstractTag = "unstruct"
-
 // hashParameters creates a deterministic hash of parameters for grouping
 func hashParameters(params map[string]string) string {
 	if len(params) == 0 {

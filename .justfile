@@ -10,7 +10,10 @@ mod? do 'examples/.justfile'
 
 # Run the full build suite
 all:
-    tidy vet test build
+    just tidy
+    just lint
+    just test
+    just build
 
 # Verify dependencies
 verify:
@@ -39,6 +42,23 @@ tidy:
 # Static analysis
 vet:
     go vet ./...
+
+# Comprehensive linting (includes vet, fmt check, and additional checks)
+lint:
+    @echo "Running comprehensive linting..."
+    @echo "  ├─ go vet (static analysis)"
+    @go vet ./...
+    @echo "  ├─ go fmt (formatting check)"
+    @test -z "$(gofmt -l . | grep -v vendor)" || (echo "Files need formatting:" && gofmt -l . | grep -v vendor && echo "Run 'just fmt' to fix." && exit 1)
+    @echo "  ├─ golangci-lint (static analysis)"
+    @golangci-lint run
+    @echo "  ├─ go mod verify (dependency integrity)"
+    @go mod verify
+    @echo "  └─ build check (compilation)"
+    @go build ./...
+    @echo "All linting checks passed!"
+
+
 
 # Format code
 fmt:

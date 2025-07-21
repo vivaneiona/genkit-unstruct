@@ -52,12 +52,11 @@ type ParentStruct struct {
 }
 
 type EdgeCaseStruct struct {
-	Ignored    string                 `json:"-"`
-	NoTag      string                 `json:"no_tag"`
-	EmptyTag   string                 `json:"empty_tag" unstruct:""`
-	TimeField  time.Time              `json:"time_field" unstruct:"temporal"`
-	unexported string                 `unstruct:"basic"`
-	Anonymous  struct{ Field string } // Anonymous struct
+	Ignored   string                 `json:"-"`
+	NoTag     string                 `json:"no_tag"`
+	EmptyTag  string                 `json:"empty_tag" unstruct:""`
+	TimeField time.Time              `json:"time_field" unstruct:"temporal"`
+	Anonymous struct{ Field string } // Anonymous struct
 }
 
 // Test structures for model prefix testing

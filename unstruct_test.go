@@ -57,9 +57,10 @@ func TestUnstructor_SchemaReflection(t *testing.T) {
 	var basicKeys []string
 	var coordKeys []string
 	for pk, keys := range sch.group2keys {
-		if pk.prompt == "basic" {
+		switch pk.prompt {
+		case "basic":
 			basicKeys = keys
-		} else if pk.prompt == "coords" {
+		case "coords":
 			coordKeys = keys
 		}
 	}
@@ -120,6 +121,7 @@ func TestUnstructor_UnstructAll(t *testing.T) {
 
 	if result == nil {
 		t.Error("Expected non-nil result")
+		return
 	}
 
 	// With our test invoker, we should get the mock data

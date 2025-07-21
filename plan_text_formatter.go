@@ -26,7 +26,7 @@ func (pb *PlanBuilder) formatNodeAsText(node *PlanNode, prefix string, isLast bo
 
 	// Format node information
 	nodeStr := pb.formatNodeInfo(node)
-	sb.WriteString(fmt.Sprintf("%s%s%s\n", prefix, connector, nodeStr))
+	fmt.Fprintf(sb, "%s%s%s\n", prefix, connector, nodeStr)
 
 	// Format children
 	childPrefix := prefix

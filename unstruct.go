@@ -358,7 +358,7 @@ func (d *DynamicUnstructor) ExtractDynamic(
 	// Convert string document to TextAsset
 	assets := []Asset{&TextAsset{Content: doc}}
 
-	result, err := d.Unstructor.Unstruct(ctx, assets, optFns...)
+	result, err := d.Unstruct(ctx, assets, optFns...)
 	if err != nil {
 		return nil, err
 	}

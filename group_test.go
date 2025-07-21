@@ -61,9 +61,10 @@ func TestWithGroup(t *testing.T) {
 		// Check groups
 		groups := make(map[string]promptKey)
 		for pk := range schema.group2keys {
-			if pk.prompt == "basic" {
+			switch pk.prompt {
+			case "basic":
 				groups["basic"] = pk
-			} else if pk.prompt == "address" {
+			case "address":
 				groups["address"] = pk
 			}
 		}

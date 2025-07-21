@@ -19,7 +19,7 @@ func TestDefaultRunner(t *testing.T) {
 	require.NotNil(t, runner, "DefaultRunner returned nil")
 
 	// Verify it implements the Runner interface
-	var _ Runner = runner
+	var _ = Runner(runner)
 
 	// Verify it's the expected concrete type
 	_, ok := runner.(*errGroupRunner)
@@ -193,7 +193,7 @@ func TestRunnerInterface(t *testing.T) {
 	ctx := context.Background()
 
 	// Test that DefaultRunner returns something that implements Runner
-	var runner Runner = DefaultRunner(ctx)
+	runner := DefaultRunner(ctx)
 
 	// Test the interface methods exist and can be called
 	runner.Go(func() error { return nil })

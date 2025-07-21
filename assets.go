@@ -230,7 +230,9 @@ func (f *FileAsset) generateFileMetadata(fileInfo os.FileInfo) (*FileMetadata, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file for checksum: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Best effort close, ignore error in defer
+	}()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {

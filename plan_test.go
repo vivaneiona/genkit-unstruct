@@ -548,7 +548,7 @@ func TestParametersAndCostFormatting(t *testing.T) {
 	for _, child := range plan.Children {
 		if child.Type == PromptCallType {
 			// Check that the model field contains parameters
-			if child.Fields != nil && len(child.Fields) > 0 {
+			if len(child.Fields) > 0 {
 				field := child.Fields[0]
 				expectedParam := false
 				switch field {
