@@ -293,7 +293,7 @@ func (u *URLAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Mes
 }
 
 func NewURLAsset(url string) *URLAsset {
-	return  &URLAsset{URL: string(url)}
+	return  &URLAsset{URL: url}
 }
 
 // NewTextAsset creates a new text asset
