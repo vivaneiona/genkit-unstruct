@@ -296,6 +296,7 @@ result, err := extractor.Unstruct(ctx, assets, unstruct.WithRunner(runner))
 - `NewTextAsset(text)` – Plain text content
 - `NewImageAsset(data, mimeType)` – Image analysis
 - `NewFileAsset(client, path, opts...)` – File upload to Google Files API
+- `NewURLAsset(url)` - Fetched html
 - `NewMultiModalAsset(text, parts...)` – Mixed content
 - `NewBatchFileAsset(client, paths)` – Multiple files
 
