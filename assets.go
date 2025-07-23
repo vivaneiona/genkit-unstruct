@@ -3,10 +3,12 @@ package unstruct
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -281,11 +283,26 @@ func (u *URLAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Mes
 	if err != nil {
 		return nil, err
 	}
-	html := string(body)
-	if html == "" || resp.StatusCode == 404 {
-		return nil, ErrEmptyDocument
+	mimeType, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type")) 
+	switch mimeType {
+	case "text/html", "text/plain":
+		text := string(body)
+		if text == "" || resp.StatusCode == 404 {
+			return nil, ErrEmptyDocument
+		}
+		return []*Message{NewUserMessage(NewTextPart(string(text)))}, nil
+	case "image/png", "image/jpeg":
+	
+	case "application/json":
+		data := make(map[string]interface{})
+		err := json.Unmarshal(body, &data)
+		if err != nil {
+			return nil, err
+		}
+		
 	}
-	return []*Message{NewUserMessage(NewTextPart(string(body)))}, nil
+	
+	return nil, errors.New("Unsupported content type")
 }
 
 func NewURLAsset(url string) *URLAsset {
