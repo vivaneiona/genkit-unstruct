@@ -61,12 +61,8 @@ func (i *ImageAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*M
 	if len(i.Data) == 0 {
 		return nil, errors.New("image data is empty")
 	}
-	part := &Part{
-		Type:     "image",
-		Data:     i.Data,
-		MimeType: i.MimeType,
-	}
-	return []*Message{NewUserMessage(part)}, nil
+
+	return []*Message{NewUserMessage(NewImagePart(i.Data, i.MimeType))}, nil
 }
 
 // MultiModalAsset represents a combination of text and media
