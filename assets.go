@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -278,6 +279,23 @@ func (u *URLAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Mes
 	// This would typically fetch content from the URL
 	// For now, this is a placeholder implementation
 	return nil, errors.New("URLAsset not implemented - would fetch URL content")
+}
+
+func NewURLAsset(url string, timeout int) *TextAsset {
+
+	client := http.Client{
+		Timeout: time.Second * time.Duration(timeout),
+	}
+	resp, err := client.Get(url)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	return  &TextAsset{Content: string(body)}
 }
 
 // NewTextAsset creates a new text asset
