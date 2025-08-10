@@ -21,7 +21,7 @@ func TestNewTextAsset(t *testing.T) {
 func TestNewImageAsset(t *testing.T) {
 	data := []byte("fake image data")
 	mimeType := "image/png"
-	asset := NewImageAsset(data, mimeType)
+	asset := NewDataAsset(data, mimeType)
 
 	assert.Equal(t, data, asset.Data)
 	assert.Equal(t, mimeType, asset.MimeType)
@@ -72,7 +72,7 @@ func TestImageAsset_CreateMessages(t *testing.T) {
 
 	t.Run("valid image data", func(t *testing.T) {
 		data := []byte("fake image data")
-		asset := &ImageAsset{Data: data, MimeType: "image/png"}
+		asset := &DataAsset{Data: data, MimeType: "image/png"}
 		messages, err := asset.CreateMessages(ctx, logger)
 
 		require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestImageAsset_CreateMessages(t *testing.T) {
 	})
 
 	t.Run("empty image data", func(t *testing.T) {
-		asset := &ImageAsset{Data: []byte{}, MimeType: "image/png"}
+		asset := &DataAsset{Data: []byte{}, MimeType: "image/png"}
 		messages, err := asset.CreateMessages(ctx, logger)
 
 		assert.Error(t, err)

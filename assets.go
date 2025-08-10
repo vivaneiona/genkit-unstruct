@@ -49,14 +49,14 @@ func (t *TextAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Me
 	return []*Message{NewUserMessage(NewTextPart(t.Content))}, nil
 }
 
-// ImageAsset represents an image document
-type ImageAsset struct {
+// DataAsset represents an image document
+type DataAsset struct {
 	Data     []byte
 	MimeType string
 }
 
 // CreateMessages implements Asset for image content
-func (i *ImageAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Message, error) {
+func (i *DataAsset) CreateMessages(ctx context.Context, log *slog.Logger) ([]*Message, error) {
 	if len(i.Data) == 0 {
 		return nil, errors.New("image data is empty")
 	}
@@ -285,9 +285,9 @@ func NewTextAsset(content string) *TextAsset {
 	return &TextAsset{Content: content}
 }
 
-// NewImageAsset creates a new image asset
-func NewImageAsset(data []byte, mimeType string) *ImageAsset {
-	return &ImageAsset{Data: data, MimeType: mimeType}
+// NewDataAsset creates a new image asset
+func NewDataAsset(data []byte, mimeType string) *DataAsset {
+	return &DataAsset{Data: data, MimeType: mimeType}
 }
 
 // NewMultiModalAsset creates a new multi-modal asset

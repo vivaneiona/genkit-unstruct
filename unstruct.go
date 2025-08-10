@@ -289,7 +289,7 @@ func (x *Unstructor[T]) Unstruct(
 			}
 		}
 	}
-	
+
 	x.log.Debug("Starting extraction", "global_model", opts.Model, "has_model_somewhere", hasModel, "timeout", opts.Timeout, "max_retries", opts.MaxRetries)
 	if !hasModel {
 		return nil, fmt.Errorf("extract: %w", ErrModelMissing)
@@ -677,7 +677,7 @@ func (x *Unstructor[T]) DryRun(
 			}
 		}
 	}
-	
+
 	if !hasModel {
 		return nil, fmt.Errorf("dry run: %w", ErrModelMissing)
 	}
