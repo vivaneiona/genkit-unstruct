@@ -18,7 +18,7 @@ func TestWithGroup(t *testing.T) {
 		opts := &Options{}
 		WithGroup("basic-info", "basic", "gemini-2.0-flash")(opts)
 
-		schema, err := schemaOfWithOptions[PersonWithGroups](opts)
+		schema, err := schemaOfWithOptions[PersonWithGroups](opts, nil)
 		require.NoError(t, err)
 
 		// Should have one group since all fields use the same group
@@ -52,7 +52,7 @@ func TestWithGroup(t *testing.T) {
 		opts := &Options{}
 		WithGroup("basic-info", "basic", "gemini-2.0-flash")(opts)
 
-		schema, err := schemaOfWithOptions[MixedPerson](opts)
+		schema, err := schemaOfWithOptions[MixedPerson](opts, nil)
 		require.NoError(t, err)
 
 		// Should have two groups
@@ -91,7 +91,7 @@ func TestWithGroup(t *testing.T) {
 		opts := &Options{}
 		// Don't define the group
 
-		schema, err := schemaOfWithOptions[PersonWithUndefinedGroup](opts)
+		schema, err := schemaOfWithOptions[PersonWithUndefinedGroup](opts, nil)
 		require.NoError(t, err)
 
 		// Should still create a group, but with the group marker as prompt
@@ -141,7 +141,7 @@ func TestGroupTagParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseUnstructTag(tt.tag, tt.inheritedPrompt)
+			result := parseUnstructTag(tt.tag, tt.inheritedPrompt, nil)
 			assert.Equal(t, tt.expectedPrompt, result.prompt)
 			assert.Equal(t, tt.expectedModel, result.model)
 		})

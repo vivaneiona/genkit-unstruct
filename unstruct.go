@@ -263,7 +263,7 @@ func (x *Unstructor[T]) Unstruct(
 	}
 
 	// 1. Get new schema with grouping logic and field model overrides
-	sch, err := schemaOfWithOptions[T](&opts)
+	sch, err := schemaOfWithOptions[T](&opts, x.log)
 	if err != nil {
 		return nil, fmt.Errorf("schema analysis failed: %w", err)
 	}
@@ -652,7 +652,7 @@ func (x *Unstructor[T]) DryRun(
 	}
 
 	// Get schema analysis with field model overrides
-	sch, err := schemaOfWithOptions[T](&opts)
+	sch, err := schemaOfWithOptions[T](&opts, x.log)
 	if err != nil {
 		return nil, fmt.Errorf("schema analysis failed: %w", err)
 	}

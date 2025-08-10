@@ -1,7 +1,7 @@
 package unstruct
 
 import (
-	"fmt"
+	"log/slog"
 	"net/url"
 	"regexp"
 	"strings"
@@ -14,8 +14,8 @@ type tagParts struct {
 	model      string            // empty ⇒ Options.Model
 	parameters map[string]string // query parameters for model configuration
 }
-
-func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
+// TODO: refactor
+func parseUnstructTag(tag, inheritedPrompt string, log *slog.Logger) (tp tagParts) {
 	// inherit by default
 	tp.prompt = inheritedPrompt
 	tp.parameters = make(map[string]string)
@@ -24,7 +24,9 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 		return
 	}
 
-	fmt.Printf("DEBUG tag: Parsing tag '%s' with inherited prompt '%s'\n", tag, inheritedPrompt)
+	if log != nil {
+		log.Debug("DEBUG tag: Parsing tag", "tag", tag, "inheritedPrompt", inheritedPrompt)
+	}
 
 	// Fast path: no "/" and no "?" means simple tag
 	if !strings.Contains(tag, "/") && !strings.Contains(tag, "?") {
@@ -150,7 +152,9 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 		}
 	}
 
-	fmt.Printf("DEBUG tag: Result: prompt='%s', model='%s', parameters=%+v\n", tp.prompt, tp.model, tp.parameters)
+	if log != nil {
+		log.Debug("DEBUG tag: Result", "prompt", tp.prompt, "model", tp.model, "parameters", tp.parameters)
+	}
 	return
 }
 

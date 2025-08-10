@@ -1,0 +1,11 @@
+Extract information from the business document image provided by the user.
+
+Focus on identifying:
+- Company name (exact name as written in the document)
+- Document type (e.g., "Invoice", "Receipt", "Statement", "Contract", etc.)
+- Total amount or main financial figure (convert to numeric value, e.g., $2,500.00 becomes 2500.00)
+- Date (in YYYY-MM-DD format if possible, or as written in the document)
+
+Look carefully at the image and extract these specific fields: {{ KeyList }}
+
+Return as JSON with exact field names and structure.

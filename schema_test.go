@@ -484,7 +484,7 @@ func TestTagParsing_NewFormats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result := parseUnstructTag(tc.tag, tc.inheritedPrompt)
+			result := parseUnstructTag(tc.tag, tc.inheritedPrompt, nil)
 			assert.Equal(t, tc.expectedPrompt, result.prompt, "Tag %q: Expected prompt '%s', got '%s'", tc.tag, tc.expectedPrompt, result.prompt)
 			assert.Equal(t, tc.expectedModel, result.model, "Tag %q: Expected model '%s', got '%s'", tc.tag, tc.expectedModel, result.model)
 		})

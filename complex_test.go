@@ -110,7 +110,7 @@ func TestTagParsing(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tp := parseUnstructTag(test.tag, test.inheritedPrompt)
+		tp := parseUnstructTag(test.tag, test.inheritedPrompt, nil)
 		assert.Equal(t, test.expectedPrompt, tp.prompt,
 			"Tag %q with inherited %q: expected prompt %q, got %q",
 			test.tag, test.inheritedPrompt, test.expectedPrompt, tp.prompt)

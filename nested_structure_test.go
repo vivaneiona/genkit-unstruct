@@ -404,7 +404,7 @@ func TestComplexNestedStructure_FieldModelOverrides(t *testing.T) {
 		},
 	}
 
-	sch, err := schemaOfWithOptions[ComplexNestedProject](opts)
+	sch, err := schemaOfWithOptions[ComplexNestedProject](opts, nil)
 	require.NoError(t, err)
 
 	// Find fields that should have custom models

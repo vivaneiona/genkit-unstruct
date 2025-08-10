@@ -61,7 +61,7 @@ func TestNewURLStyleSyntax(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result := parseUnstructTag(tc.tag, tc.inheritedPrompt)
+			result := parseUnstructTag(tc.tag, tc.inheritedPrompt, nil)
 			assert.Equal(t, tc.expectedPrompt, result.prompt, "Tag %q: prompt mismatch", tc.tag)
 			assert.Equal(t, tc.expectedModel, result.model, "Tag %q: model mismatch", tc.tag)
 		})
@@ -103,7 +103,7 @@ func TestURLParsingWithParameters(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.tag, func(t *testing.T) {
-			result := parseUnstructTag(test.tag, "inherited")
+			result := parseUnstructTag(test.tag, "inherited", nil)
 
 			assert.Equal(t, test.expectedPrompt, result.prompt, "Expected prompt '%s', got '%s'", test.expectedPrompt, result.prompt)
 			assert.Equal(t, test.expectedModel, result.model, "Expected model '%s', got '%s'", test.expectedModel, result.model)
@@ -118,7 +118,7 @@ func TestURLParsingWithParameters(t *testing.T) {
 func TestQueryParameterParsing(t *testing.T) {
 	// Test tag with query parameters
 	tag := "model/vertex/gemini-1.5-flash?temperature=0.5&topK=10"
-	result := parseUnstructTag(tag, "inherited")
+	result := parseUnstructTag(tag, "inherited", nil)
 
 	// Check basic parsing
 	assert.Equal(t, "inherited", result.prompt, "Expected prompt 'inherited', got '%s'", result.prompt)

@@ -28,7 +28,7 @@ func TestGroupIntegration(t *testing.T) {
 		WithGroup("contact", "contact", "gemini-1.5-flash")(opts)
 		WithGroup("personal", "personal", "gemini-2.0-flash")(opts)
 
-		schema, err := schemaOfWithOptions[Employee](opts)
+		schema, err := schemaOfWithOptions[Employee](opts, nil)
 		require.NoError(t, err)
 
 		// Should have 4 groups:
@@ -64,7 +64,7 @@ func TestGroupIntegration(t *testing.T) {
 		WithGroup("inherited", "inherited-prompt", "gemini-1.5-flash")(opts)
 		WithGroup("parent", "parent-prompt", "gemini-2.0-flash")(opts)
 
-		schema, err := schemaOfWithOptions[ParentStruct](opts)
+		schema, err := schemaOfWithOptions[ParentStruct](opts, nil)
 		require.NoError(t, err)
 
 		// Should have 2 groups
@@ -107,7 +107,7 @@ func TestGroupWithFlattenGroups(t *testing.T) {
 		opts := &Options{}
 		WithGroup("shared", "shared-prompt", "gemini-2.0-flash")(opts)
 
-		schema, err := schemaOfWithOptions[Root](opts)
+		schema, err := schemaOfWithOptions[Root](opts, nil)
 		require.NoError(t, err)
 
 		// Without flattening, different parent paths create separate groups
@@ -119,7 +119,7 @@ func TestGroupWithFlattenGroups(t *testing.T) {
 		WithGroup("shared", "shared-prompt", "gemini-2.0-flash")(opts)
 		WithFlattenGroups()(opts)
 
-		schema, err := schemaOfWithOptions[Root](opts)
+		schema, err := schemaOfWithOptions[Root](opts, nil)
 		require.NoError(t, err)
 
 		// With flattening, should have only 1 group since all fields use the same prompt+model

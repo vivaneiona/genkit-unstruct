@@ -48,7 +48,7 @@ func TestSchemaOfWithOptions_FieldModelOverrides(t *testing.T) {
 	}
 
 	// Generate schema with options
-	sch, err := schemaOfWithOptions[TestStruct](opts)
+	sch, err := schemaOfWithOptions[TestStruct](opts, nil)
 	require.NoError(t, err)
 
 	// Verify that field-specific models are applied correctly
@@ -74,7 +74,7 @@ func TestSchemaOfWithOptions_PromptGrouping(t *testing.T) {
 		},
 	}
 
-	sch, err := schemaOfWithOptions[TestStruct](opts)
+	sch, err := schemaOfWithOptions[TestStruct](opts, nil)
 	require.NoError(t, err)
 
 	// We should have at least 2 groups due to different models

@@ -3,6 +3,7 @@ package unstruct
 import (
 	"crypto/md5"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"sort"
 	"strings"
@@ -58,10 +59,10 @@ type schema struct {
 }
 
 func schemaOf[T any]() (*schema, error) {
-	return schemaOfWithOptions[T](nil)
+	return schemaOfWithOptions[T](nil, nil)
 }
 
-func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
+func schemaOfWithOptions[T any](opts *Options, log *slog.Logger) (*schema, error) {
 	var zero T
 	rt := reflect.TypeOf(zero)
 	if rt.Kind() != reflect.Struct {
@@ -89,7 +90,7 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 				jsonKey = f.Name
 			}
 			fullKey := joinKey(parent, jsonKey)
-			tp := parseUnstructTag(f.Tag.Get("unstruct"), inheritedPrompt)
+			tp := parseUnstructTag(f.Tag.Get("unstruct"), inheritedPrompt, log)
 
 			// Resolve group references
 			prompt := tp.prompt
