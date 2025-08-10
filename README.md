@@ -1,4 +1,4 @@
-# genkit-unstruct
+# genkit-unstruct 🚧 PoC
 
 Concurrent data extraction from unstructured text and images using AI models.
 
