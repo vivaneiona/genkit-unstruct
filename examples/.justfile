@@ -4,6 +4,7 @@ default:
 
 mod? basic 'basic/.justfile'
 mod? basic_image 'basic_image/.justfile'
+mod? basic_files 'basic_files/.justfile'
 mod? openai_and_gemini 'openai_and_gemini/.justfile'
 mod? stick 'stick/.justfile'
 mod? complex 'complex/.justfile'
