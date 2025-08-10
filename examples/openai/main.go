@@ -127,9 +127,9 @@ func main() {
 	// 1️⃣
 	slog.Debug("Setting up prompts", "prompt_count", 3)
 	prompts := filePrompts{
-		"customer":  `Extract customer personal information from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON. Text: {{.Document}}`,
-		"business":  `Extract business information from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON. Text: {{.Document}}`,
-		"financial": `Extract financial information from this text and return as JSON with fields: {{.Keys}}. Return numeric values for revenue and budget as numbers, not strings. Example: {"revenue": 1500000, "budget": 250000}. Text: {{.Document}}`,
+		"customer":  `Extract customer personal information from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON.`,
+		"business":  `Extract business information from this text and return as JSON with fields: {{.Keys}}. Return only valid JSON.`,
+		"financial": `Extract financial information from this text and return as JSON with fields: {{.Keys}}. Return numeric values for revenue and budget as numbers, not strings. Example: {"revenue": 1500000, "budget": 250000}.`,
 	}
 	slog.Debug("prompts configured", "customer_prompt_length", len(prompts["customer"]), "business_prompt_length", len(prompts["business"]), "financial_prompt_length", len(prompts["financial"]))
 

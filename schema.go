@@ -73,9 +73,9 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 		group2specs: map[promptKey]promptGroup{},
 		json2field:  map[string]fieldSpec{},
 	}
-
-	var walk func(t reflect.Type, parent, inheritedPrompt, inheritedModel string, idx []int)
-	walk = func(t reflect.Type, parent, inheritedPrompt, inheritedModel string, idx []int) {
+	// TODO: refactor
+	var walk func(t reflect.Type, parent, inheritedPrompt, inheritedModel string, inheritedParameters map[string]string, idx []int)
+	walk = func(t reflect.Type, parent, inheritedPrompt, inheritedModel string, inheritedParameters map[string]string, idx []int) {
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
 			if f.Anonymous || !f.IsExported() {
@@ -95,6 +95,12 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 			prompt := tp.prompt
 			model := tp.model
 			parameters := tp.parameters
+
+			// Inherit parameters if none specified in tag
+			if len(parameters) == 0 && len(inheritedParameters) > 0 {
+				parameters = inheritedParameters
+			}
+
 			if strings.HasPrefix(tp.prompt, "group:") {
 				groupName := strings.TrimPrefix(tp.prompt, "group:")
 				if opts != nil && opts.Groups != nil {
@@ -129,7 +135,7 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 					parameters: parameters,
 					index:      nextIdx,
 				}
-				walk(f.Type, fullKey, prompt, model, nextIdx)
+				walk(f.Type, fullKey, prompt, model, parameters, nextIdx)
 				continue
 			}
 
@@ -141,7 +147,7 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 					parameters: parameters,
 					index:      nextIdx,
 				}
-				walk(f.Type.Elem(), fullKey, prompt, model, nextIdx)
+				walk(f.Type.Elem(), fullKey, prompt, model, parameters, nextIdx)
 				continue
 			}
 
@@ -170,7 +176,7 @@ func schemaOfWithOptions[T any](opts *Options) (*schema, error) {
 			}
 		}
 	}
-	walk(rt, "", "", "", nil)
+	walk(rt, "", "", "", nil, nil)
 	return s, nil
 }
 

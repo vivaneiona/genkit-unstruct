@@ -1,0 +1,10 @@
+Extract basic company information from the business document that will be provided in the user message.
+
+Focus on identifying:
+- Company name (exact name as written)
+- Financial capitalization amount (convert to numeric value, e.g., $2.5M becomes 2500000)
+- Document type (e.g., "Annual Report", "Financial Statement", etc.)
+
+Extract these specific fields: {{ KeyList }}
+
+Return as JSON with exact field names and structure.

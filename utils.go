@@ -9,23 +9,6 @@ import (
 	"time"
 )
 
-// buildPrompt constructs the final prompt from template, keys, and document
-func buildPrompt(tpl string, keys []string, doc string) string {
-	slog.Debug("starting prompt construction", "template_length", len(tpl), "keys_count", len(keys), "document_length", len(doc))
-
-	originalTpl := tpl
-	if strings.Contains(tpl, "{{.Keys}}") {
-		keysStr := strings.Join(keys, ",")
-		tpl = strings.ReplaceAll(tpl, "{{.Keys}}", keysStr)
-		slog.Debug("Replaced keys placeholder", "keys", keysStr)
-	}
-
-	finalPrompt := tpl + "\n\n<<DOC>>\n" + doc + "\n<<END>>"
-	slog.Debug("constructed final prompt", "original_template_length", len(originalTpl), "final_prompt_length", len(finalPrompt))
-
-	return finalPrompt
-}
-
 // traverse returns value and a boolean 'found'.
 func traverse(m map[string]any, path string) (any, bool) {
 	parts := strings.Split(path, ".")

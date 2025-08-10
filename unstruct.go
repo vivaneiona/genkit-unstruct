@@ -31,6 +31,11 @@ func NewUserMessage(parts ...*Part) *Message {
 	return &Message{Role: "user", Parts: parts}
 }
 
+// NewSystemMessage creates a new system message
+func NewSystemMessage(parts ...*Part) *Message {
+	return &Message{Role: "system", Parts: parts}
+}
+
 // Unstructor provides multi-prompt extraction capabilities.
 type Unstructor[T any] struct {
 	invoker Invoker
@@ -208,8 +213,21 @@ func (x *Unstructor[T]) Unstruct(
 	assets []Asset,
 	optFns ...func(*Options),
 ) (*T, error) {
+	x.log.Debug("=== UNSTRUCT STARTED ===",
+		"assets_count", len(assets),
+		"options_count", len(optFns),
+		"prompt_provider_type", fmt.Sprintf("%T", x.prompts))
+
 	if len(assets) == 0 {
+		x.log.Debug("No assets provided", "error", ErrEmptyAssets)
 		return nil, fmt.Errorf("extract: %w", ErrEmptyAssets)
+	}
+
+	// Log assets details
+	for i, asset := range assets {
+		x.log.Debug("Asset details",
+			"index", i,
+			"asset_type", fmt.Sprintf("%T", asset))
 	}
 
 	var opts Options
@@ -218,10 +236,11 @@ func (x *Unstructor[T]) Unstruct(
 		fn(&opts)
 	}
 
-	x.log.Debug("Starting extraction", "model", opts.Model, "timeout", opts.Timeout, "max_retries", opts.MaxRetries)
-	if opts.Model == "" {
-		return nil, fmt.Errorf("extract: %w", ErrModelMissing)
-	}
+	x.log.Debug("Options configured",
+		"model", opts.Model,
+		"timeout", opts.Timeout,
+		"max_retries", opts.MaxRetries,
+		"backoff", opts.Backoff)
 
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -250,6 +269,32 @@ func (x *Unstructor[T]) Unstruct(
 	}
 	x.log.Debug("Analyzed schema", "group_count", len(sch.group2keys), "field_count", len(sch.json2field))
 
+	// 2. Validate that at least one model is specified (either globally or per-field/group)
+	hasModel := opts.Model != ""
+	if !hasModel {
+		// Check if any prompt group has a model specified
+		for pk := range sch.group2keys {
+			if pk.model != "" {
+				hasModel = true
+				break
+			}
+		}
+		// If no group models, check individual fields
+		if !hasModel {
+			for _, fieldSpec := range sch.json2field {
+				if fieldSpec.model != "" {
+					hasModel = true
+					break
+				}
+			}
+		}
+	}
+	
+	x.log.Debug("Starting extraction", "global_model", opts.Model, "has_model_somewhere", hasModel, "timeout", opts.Timeout, "max_retries", opts.MaxRetries)
+	if !hasModel {
+		return nil, fmt.Errorf("extract: %w", ErrModelMissing)
+	}
+
 	// 2. Fan-out prompt calls with improved grouping and model-specific handling.
 	type frag struct {
 		prompt string
@@ -264,6 +309,7 @@ func (x *Unstructor[T]) Unstruct(
 	x.log.Debug("Starting concurrent prompt calls", "prompt_count", len(sch.group2keys))
 	for pk, keys := range sch.group2keys {
 		pk, keys := pk, keys // loop capture
+		x.log.Debug("Processing prompt key", "prompt", pk.prompt, "model", pk.model, "keys", keys)
 		r.Go(func() error {
 			model := opts.Model
 			var parameters map[string]string
@@ -271,6 +317,9 @@ func (x *Unstructor[T]) Unstruct(
 			// Get parameters from group specs
 			if groupSpec, exists := sch.group2specs[pk]; exists {
 				parameters = groupSpec.parameters
+				x.log.Debug("Got parameters from group spec", "parameters", parameters)
+			} else {
+				x.log.Debug("No group spec found for prompt key", "pk", pk)
 			}
 
 			// Use model from promptKey if specified, otherwise check individual fields
@@ -473,10 +522,27 @@ func (x *Unstructor[T]) callPrompt(
 	var err error
 
 	// Check if the prompt provider supports contextual prompts (like Stick templates)
+	x.log.Debug("Checking prompt provider type",
+		"provider_type", fmt.Sprintf("%T", x.prompts),
+		"label", label,
+		"keys", keys,
+		"document_length", len(textContent),
+		"document_preview", textContent[:min(100, len(textContent))])
+
 	if contextProvider, ok := x.prompts.(ContextualPromptProvider); ok {
+		x.log.Debug("Using ContextualPromptProvider (Stick/Twig)", "provider_type", fmt.Sprintf("%T", contextProvider))
 		tpl, err = contextProvider.GetPromptWithContext(label, 1, keys, textContent)
+		x.log.Debug("Got template from contextual provider",
+			"template_length", len(tpl),
+			"template_preview", tpl[:min(200, len(tpl))],
+			"error", err)
 	} else {
+		x.log.Debug("Using basic PromptProvider", "provider_type", fmt.Sprintf("%T", x.prompts))
 		tpl, err = x.prompts.GetPrompt(label, 1)
+		x.log.Debug("Got template from basic provider",
+			"template_length", len(tpl),
+			"template_preview", tpl[:min(200, len(tpl))],
+			"error", err)
 	}
 
 	if err != nil {
@@ -484,14 +550,21 @@ func (x *Unstructor[T]) callPrompt(
 		return nil, err
 	}
 
-	// For non-contextual providers, still use buildPrompt for {{.Keys}} replacement
-	var prompt string
-	if _, ok := x.prompts.(ContextualPromptProvider); ok {
-		// Contextual providers already have variables replaced
-		prompt = tpl
-	} else {
-		prompt = buildPrompt(tpl, keys, textContent)
+	// Use the template we already got
+	prompt := tpl
+	if _, ok := x.prompts.(ContextualPromptProvider); !ok {
+		x.log.Debug("Using basic provider - replacing {{.Keys}} placeholder")
+		// Replace keys placeholder manually for basic providers
+		if strings.Contains(prompt, "{{.Keys}}") {
+			keysStr := strings.Join(keys, ",")
+			prompt = strings.ReplaceAll(prompt, "{{.Keys}}", keysStr)
+			x.log.Debug("Replaced {{.Keys}} placeholder", "keys", keysStr)
+		}
 	}
+
+	x.log.Debug("Final prompt constructed",
+		"final_prompt_length", len(prompt),
+		"final_prompt_preview", prompt[:min(300, len(prompt))])
 
 	// Collect all media parts from all messages
 	var mediaParts []*Part
@@ -509,10 +582,39 @@ func (x *Unstructor[T]) callPrompt(
 
 		// If we have parameters, use GenerateBytes directly for better control
 		if len(parameters) > 0 {
-			// Build messages for GenerateBytes
-			messages := []*Message{NewUserMessage(
-				append([]*Part{NewTextPart(prompt)}, mediaParts...)...,
-			)}
+			// Build proper conversation messages
+			var messages []*Message
+
+			// Add system message with the template/instructions
+			messages = append(messages, NewSystemMessage(NewTextPart(prompt)))
+
+			// Add user messages with actual content
+			for _, msg := range allMessages {
+				userParts := append([]*Part(nil), msg.Parts...)
+				if len(userParts) > 0 {
+					messages = append(messages, NewUserMessage(userParts...))
+				}
+			}
+
+			x.log.Debug("Built conversation",
+				"message_count", len(messages),
+				"system_prompt_length", len(prompt),
+				"user_messages", len(allMessages))
+
+			// Debug each message
+			for i, msg := range messages {
+				x.log.Debug("Message details",
+					"index", i,
+					"role", msg.Role,
+					"parts_count", len(msg.Parts))
+				for j, part := range msg.Parts {
+					x.log.Debug("Part details",
+						"message_index", i,
+						"part_index", j,
+						"type", part.Type,
+						"text_preview", part.Text[:min(100, len(part.Text))])
+				}
+			}
 
 			result, genErr = GenerateBytes(ctx, x.invoker.(*genkitInvoker).client, x.log,
 				WithModelName(model),
@@ -549,14 +651,35 @@ func (x *Unstructor[T]) DryRun(
 		fn(&opts)
 	}
 
-	if opts.Model == "" {
-		return nil, fmt.Errorf("dry run: %w", ErrModelMissing)
-	}
-
 	// Get schema analysis with field model overrides
 	sch, err := schemaOfWithOptions[T](&opts)
 	if err != nil {
 		return nil, fmt.Errorf("schema analysis failed: %w", err)
+	}
+
+	// Validate that at least one model is specified (either globally or per-field/group)
+	hasModel := opts.Model != ""
+	if !hasModel {
+		// Check if any prompt group has a model specified
+		for pk := range sch.group2keys {
+			if pk.model != "" {
+				hasModel = true
+				break
+			}
+		}
+		// If no group models, check individual fields
+		if !hasModel {
+			for _, fieldSpec := range sch.json2field {
+				if fieldSpec.model != "" {
+					hasModel = true
+					break
+				}
+			}
+		}
+	}
+	
+	if !hasModel {
+		return nil, fmt.Errorf("dry run: %w", ErrModelMissing)
 	}
 
 	// Collect statistics without making actual calls
@@ -618,7 +741,12 @@ func (x *Unstructor[T]) DryRun(
 		}
 
 		// Build the full prompt for token estimation
-		fullPrompt := buildPrompt(tpl, keys, textContent)
+		fullPrompt := tpl
+		// Replace keys placeholder manually for estimation
+		if strings.Contains(fullPrompt, "{{.Keys}}") {
+			keysStr := strings.Join(keys, ",")
+			fullPrompt = strings.ReplaceAll(fullPrompt, "{{.Keys}}", keysStr)
+		}
 
 		// Estimate tokens
 		inputTokens := EstimateTokensFromText(fullPrompt)

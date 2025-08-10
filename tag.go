@@ -1,6 +1,7 @@
 package unstruct
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -22,6 +23,8 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 	if tag == "" {
 		return
 	}
+
+	fmt.Printf("DEBUG tag: Parsing tag '%s' with inherited prompt '%s'\n", tag, inheritedPrompt)
 
 	// Fast path: no "/" and no "?" means simple tag
 	if !strings.Contains(tag, "/") && !strings.Contains(tag, "?") {
@@ -147,6 +150,7 @@ func parseUnstructTag(tag, inheritedPrompt string) (tp tagParts) {
 		}
 	}
 
+	fmt.Printf("DEBUG tag: Result: prompt='%s', model='%s', parameters=%+v\n", tp.prompt, tp.model, tp.parameters)
 	return
 }
 
